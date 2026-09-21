@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "Certimens Web Shield",
+  "version": "13.0.0",
+  "description": "L'Éclaireur web Certimens. Fait le pont entre Google Docs/Word Online et le moteur biométrique.",
+  
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "certimens-shield@univ.fr"
+    }
+  },
+
+  "permissions": [
+    "tabs",
+    "downloads"
+  ],
+  
+  "host_permissions": [
+    "https://docs.google.com/document/*",
+    "https://*.sharepoint.com/*",
+    "https://onedrive.live.com/*",
+    "https://*.officeapps.live.com/*"
+  ],
+
+  "background": {
+    "scripts": ["background.js"]
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://docs.google.com/document/*",
+        "https://*.sharepoint.com/*",
+        "https://onedrive.live.com/*",
+        "https://*.officeapps.live.com/*"
+      ],
+      "js": ["content.js"]
+    }
+  ],
+
+  "action": {
+    "default_title": "Certimens",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  }
+}
