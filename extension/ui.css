@@ -1,0 +1,134 @@
+/* Shared styles for the popup, the options page and the Word task pane. They follow the same art
+   direction as the engine UI — its brand guidelines (docs/charte-graphique.md) and the MUI theme
+   that applies them (ui/src/theme.ts): Plus Jakarta Sans with heavy headings over a medium body,
+   slate as the dominant color, brass gold as the single accent, flat surfaces on a hairline. */
+
+@font-face { font-family: 'Plus Jakarta Sans'; font-weight: 400; font-display: swap; src: url('fonts/plus-jakarta-sans-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Plus Jakarta Sans'; font-weight: 600; font-display: swap; src: url('fonts/plus-jakarta-sans-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Plus Jakarta Sans'; font-weight: 700; font-display: swap; src: url('fonts/plus-jakarta-sans-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Plus Jakarta Sans'; font-weight: 800; font-display: swap; src: url('fonts/plus-jakarta-sans-latin-800-normal.woff2') format('woff2'); }
+
+:root {
+    /* Slate: the dominant color, and what the actions are made of. */
+    --primary: #1e293b;
+    --primary-dark: #0f172a;
+    --primary-soft: rgba(30, 41, 59, 0.08);
+    /* Brass gold: the single accent, for the word mark and highlights. It is never text on white
+       (~2.3:1); where it has to read as text — the links — the dark brass is used (~5.7:1). */
+    --accent: #c5a059;
+    --accent-text: #705e3a;
+    --bg: #f8fafc;
+    --paper: #fff;
+    --text: #1a202c;
+    --text-secondary: #54595f;
+    --divider: #e5e5e5;
+    --border: rgba(0, 0, 0, 0.23);
+    /* Verdict colors carry meaning rather than brand: they stay outside the guidelines. */
+    --success: #137333;
+    --warning: #b06000;
+    --error: #c5221f;
+    --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    /* The weight contrast is the most recognizable trait: body 500, headings 800. */
+    font-weight: 500;
+    line-height: 1.5;
+}
+
+[hidden] { display: none !important; }
+
+h1 { margin: 0; font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em; }
+h2 { margin: 0; font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em; }
+p { margin: 0; }
+
+/* Brand block: the gold shield, then the word mark with its second half in gold. */
+.brand { display: flex; align-items: center; gap: 8px; }
+.brand .mark { width: 28px; height: 28px; }
+.brand .mens { color: var(--accent); }
+.brand .version { align-self: flex-end; padding-bottom: 3px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+
+.muted { color: var(--text-secondary); }
+.small { font-size: 12px; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Flat surfaces separated by a hairline, as the site's sections are — not floating cards. */
+.card {
+    background: var(--paper);
+    border: 1px solid var(--divider);
+    border-radius: var(--radius);
+    padding: 24px;
+}
+
+/* MUI's outlined field: label above, border turning to the primary color on focus. */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.field input, .field select {
+    width: 100%;
+    padding: 12px 14px;
+    font: inherit;
+    font-size: 15px;
+    color: var(--text);
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    outline: none;
+}
+.field input:hover, .field select:hover { border-color: var(--text); }
+.field input:focus, .field select:focus { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 22px;
+    min-height: 40px;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--primary);
+    border: 0;
+    border-radius: var(--radius);
+    cursor: pointer;
+    text-decoration: none;
+}
+.btn:hover { background: var(--primary-dark); }
+.btn:disabled { color: rgba(0, 0, 0, 0.26); background: rgba(0, 0, 0, 0.12); cursor: default; }
+.btn.block { width: 100%; }
+label.btn.disabled { opacity: 0.5; pointer-events: none; }
+.btn.outlined { color: var(--primary); background: transparent; box-shadow: inset 0 0 0 1px rgba(30, 41, 59, 0.5); }
+.btn.outlined:hover { background: var(--primary-soft); box-shadow: inset 0 0 0 1px var(--primary); }
+
+/* Links read as brass rather than slate, and underline on hover only — the engine's MuiLink. */
+.link {
+    padding: 0;
+    font: inherit;
+    font-weight: 600;
+    color: var(--accent-text);
+    background: none;
+    border: 0;
+    cursor: pointer;
+    text-decoration: none;
+}
+a { color: var(--accent-text); font-weight: 600; text-decoration: none; }
+.link:hover, a:hover { text-decoration: underline; }
+
+/* MUI's standard alert. */
+.alert { padding: 8px 16px; border-radius: var(--radius); font-weight: 500; }
+.alert:empty { display: none; }
+.alert.ok { color: #1e4620; background: #edf7ed; }
+.alert.error { color: #5f2120; background: #fdeded; }
+.alert.info { color: #014361; background: #e5f6fd; }
+
+.status { display: flex; flex-direction: column; gap: 4px; }
+.status div:first-child { font-weight: 700; }

@@ -1,0 +1,114 @@
+name: CI
+
+# Lint et build de l'extension sur chaque branche et PR. Aussi appelée par release.yml, qui
+# publie les paquets construits ici (artefacts `extension` et `safari-xcode`) : une CI en échec
+# bloque la publication, et tous les navigateurs reçoivent le même build.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_call:
+    inputs:
+      version:
+        description: Version attendue dans le manifest (tag de release)
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  extension:
+    name: Extension
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth 0: the build reads the last tag (git describe) to version a branch build.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Lint (ESLint)
+        run: npm run lint
+      # With a tag (release), it drives every package; without one, the build falls back to
+      # the last tag plus the commit.
+      - name: Build
+        run: npm run build -- ${VERSION:+--release "$VERSION"}
+        env:
+          VERSION: ${{ inputs.version }}
+      - name: Lint (Firefox add-on)
+        run: npm run lint:firefox
+      - name: Validate Word add-in manifest
+        run: npm run lint:word
+      - name: Test LibreOffice extension
+        run: npm run test:libreoffice
+      # Paquets des stores, repris tels quels par release.yml.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: extension
+          path: dist/*.zip
+      # Extension dépaquetée, par navigateur, pour l'installer à la main : l'artefact téléchargé,
+      # une fois dézippé, est le dossier à charger.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: certimens-chrome
+          path: dist/chrome/
+      - uses: actions/upload-artifact@v7
+        with:
+          name: certimens-firefox
+          path: dist/firefox/
+      # Site du complément Word (publié sur GitHub Pages par release.yml) et manifest de test local.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: certimens-word
+          path: |
+            dist/word/
+            dist/word-localhost.xml
+      - uses: actions/upload-artifact@v7
+        with:
+          name: certimens-libreoffice
+          path: dist/libreoffice.oxt
+      - name: Install instructions
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ### Installer ce build à la main ($(cat dist/VERSION))
+
+          Télécharger l'artefact en bas de cette page, puis le dézipper :
+
+          - **Chrome, Edge, Brave, Opera, Vivaldi, Arc** : \`certimens-chrome\` → \`chrome://extensions\`
+            (ou \`edge://\`, \`brave://\`…) → *Mode développeur* → *Charger l'extension non empaquetée*
+            → le dossier dézippé. Pour mettre à jour : remplacer le dossier, puis ↻ sur la carte de l'extension.
+          - **Firefox** : \`certimens-firefox\` → \`about:debugging#/runtime/this-firefox\` →
+            *Charger un module complémentaire temporaire* → \`manifest.json\` du dossier dézippé
+            (retiré à la fermeture de Firefox).
+          - **Safari** : \`safari-xcode\` (job macOS) → ouvrir le projet dans Xcode, voir le README.
+          - **LibreOffice** : \`certimens-libreoffice\` → *Outils › Gestionnaire des extensions ›
+            Ajouter* → \`libreoffice.oxt\`, puis redémarrer LibreOffice.
+          - **Word** : \`certimens-word\` dézippé dans \`dist/\` d'un clone du dépôt → \`npm run word:serve\`, puis charger
+            \`word-localhost.xml\` dans Word (voir le README).
+          EOF
+
+  safari:
+    name: Safari (Xcode)
+    needs: extension
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v7
+        with:
+          name: extension
+          path: dist
+      - name: Unpack
+        run: unzip -q dist/safari.zip -d dist/safari
+      - name: Convert and build (unsigned)
+        run: scripts/safari.sh
+      - name: Pack Xcode project
+        run: ditto -c -k --keepParent dist/safari-xcode dist/safari-xcode.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: safari-xcode
+          path: dist/safari-xcode.zip

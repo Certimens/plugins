@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<!-- Landing page of the add-in's site. GitHub Pages serves no directory listing, so without it
+     https://certimens.github.io/plugins/word/ answers 404 even though every file is there.
+     Word never loads this page: it goes straight to taskpane.html. -->
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Certimens — Complément Word</title>
+    <link rel="icon" href="icons/icon32.png">
+    <link rel="stylesheet" href="ui.css">
+    <style>
+        body { padding: 40px 16px; }
+        main { max-width: 520px; margin: 0 auto; }
+        h2 { font-size: 1.0625rem; font-weight: 700; letter-spacing: 0; }
+    </style>
+</head>
+<body>
+    <main class="stack">
+        <div class="card stack">
+            <div class="stack" style="gap: 8px">
+                <div class="brand">
+                    <img class="mark" src="icons/icon128.png" alt="">
+                    <h1>Certi<span class="mens">mens</span></h1>
+                    <span class="version">{{VERSION}}</span>
+                </div>
+                <p class="muted">Ce site héberge le <strong>complément Word</strong> de Certimens, l'agent de
+                    rédaction que Word charge dans son volet. Il mesure la rédaction (rythme, pauses, corrections,
+                    collages) et envoie des compteurs à l'espace Certimens de l'étudiant : aucun texte ni aucune
+                    touche n'est enregistré.</p>
+            </div>
+
+            <div class="stack" style="gap: 6px">
+                <h2>Charger le complément</h2>
+                <p class="muted small">Dans Word : <em>Accueil › Compléments › Plus de compléments › Mes
+                    compléments › Charger mon complément</em>, puis désigner le manifest.</p>
+                <a href="manifest.xml">manifest.xml</a>
+            </div>
+
+            <div class="alert info small">Le volet est <a href="taskpane.html">taskpane.html</a>. Ouvert
+                directement dans un navigateur, il ne mesure rien : c'est Word qui l'appelle, avec Office.js.</div>
+        </div>
+
+        <p class="muted small">Certimens — <a href="https://certimens.fr">certimens.fr</a> ·
+            <a href="mailto:contact@certimens.fr">contact@certimens.fr</a></p>
+    </main>
+</body>
+</html>

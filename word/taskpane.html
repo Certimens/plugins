@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Certimens — Agent de rédaction</title>
+    <link rel="stylesheet" href="ui.css">
+    <style>
+        body { padding: 16px; }
+        h1 { font-size: 1.35rem; }
+        h2 { font-size: 1.0625rem; font-weight: 700; letter-spacing: 0; }
+        .brand .mark { width: 24px; height: 24px; }
+        .card { padding: 16px; }
+    </style>
+    <!-- Office.js must be loaded from Microsoft's CDN (required by AppSource). -->
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+</head>
+<body class="stack" style="gap: 12px">
+    <div class="brand">
+        <img class="mark" src="icons/icon128.png" alt="">
+        <h1>Certi<span class="mens">mens</span></h1>
+    </div>
+
+    <form id="login" class="card stack" hidden>
+        <p class="muted">Connectez-vous à votre espace Certimens.</p>
+        <div class="field">
+            <label for="email">E-mail</label>
+            <input id="email" type="email" required autocomplete="username">
+        </div>
+        <div class="field">
+            <label for="password">Mot de passe</label>
+            <input id="password" type="password" required autocomplete="current-password">
+        </div>
+        <div class="field">
+            <label for="engineUrl">Adresse du moteur</label>
+            <input id="engineUrl" type="url" required placeholder="https://monespace.certimens.fr">
+        </div>
+        <button type="submit" class="btn block">Se connecter</button>
+    </form>
+
+    <div id="account" class="stack" style="gap: 12px" hidden>
+        <div class="row small">
+            <span class="muted">Connecté : <strong id="who" style="color: var(--text)"></strong></span>
+            <button type="button" id="logout" class="link small">Se déconnecter</button>
+        </div>
+
+        <div class="card stack">
+            <div class="muted small">Document ouvert</div>
+            <div id="linked" class="stack" style="gap: 6px" hidden>
+                <h2 id="linkedName"></h2>
+                <div class="alert ok small">Fichier Certimens associé : les mesures y sont envoyées.</div>
+                <div id="submitted" class="muted small" hidden></div>
+                <a id="open" class="small" target="_blank" rel="noopener">Ouvrir dans Certimens</a>
+                <div class="stack" style="gap: 6px; margin-top: 6px">
+                    <button type="button" id="uploadDocx" class="btn outlined block">Envoyer le .docx</button>
+                    <div id="uploadHint" class="muted small"></div>
+                </div>
+            </div>
+            <form id="create" class="stack" hidden>
+                <div class="field">
+                    <label for="documentName">Nom du fichier</label>
+                    <input id="documentName" required>
+                </div>
+            </form>
+            <div id="assignmentBox" class="field" hidden>
+                <label for="assignment">Devoir</label>
+                <select id="assignment"></select>
+            </div>
+            <button type="submit" form="create" id="createBtn" class="btn block" hidden>Créer le fichier</button>
+            <button type="button" id="submit" class="btn block" hidden>Rendre sur ce devoir</button>
+        </div>
+    </div>
+
+    <div id="message" class="alert small"></div>
+
+    <div id="sync" class="muted small"></div>
+    <div id="webNote" class="muted small" hidden>
+        Sur Word pour le web, l'extension navigateur Certimens mesure déjà la rédaction : n'utilisez
+        que l'un des deux, sinon l'activité est comptée deux fois.
+    </div>
+
+    <script src="ui.js"></script>
+    <script src="agent.js"></script>
+    <script src="sensor.js"></script>
+    <script src="taskpane.js"></script>
+</body>
+</html>

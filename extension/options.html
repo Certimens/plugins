@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Certimens — Agent de rédaction</title>
+    <link rel="stylesheet" href="ui.css">
+    <style>
+        body { padding: 40px 16px; }
+        main { max-width: 480px; margin: 0 auto; }
+    </style>
+</head>
+<body>
+    <main class="stack">
+        <div class="card stack">
+            <div class="stack" style="gap: 8px">
+                <div class="brand"><img class="mark" src="icons/icon128.png" alt=""><h1>Certi<span class="mens">mens</span></h1><span id="version" class="version"></span></div>
+                <p class="muted">Agent de rédaction pour Google Docs et Word Online. Il mesure votre rédaction
+                    (rythme, pauses, corrections, collages) et l'envoie à votre espace Certimens. Aucun texte ni
+                    aucune touche n'est enregistré : uniquement des compteurs.</p>
+            </div>
+
+            <form id="form" class="stack">
+                <div class="field">
+                    <label for="engineUrl">Adresse du moteur</label>
+                    <input id="engineUrl" type="url" required placeholder="https://monespace.certimens.fr">
+                </div>
+                <div class="field">
+                    <label for="email">E-mail</label>
+                    <input id="email" type="email" required autocomplete="username">
+                </div>
+                <div class="field">
+                    <label for="password">Mot de passe</label>
+                    <input id="password" type="password" required autocomplete="current-password">
+                </div>
+                <div class="actions">
+                    <button type="submit" class="btn">Se connecter</button>
+                    <button type="button" id="test" class="btn outlined">Tester la connexion</button>
+                </div>
+            </form>
+            <div id="message" class="alert"></div>
+        </div>
+
+        <div class="card">
+            <h2 style="margin-bottom: 8px">Synchronisation</h2>
+            <div id="status" class="status muted">Chargement de l'état…</div>
+        </div>
+
+        <div class="card stack" style="gap: 12px">
+            <div class="stack" style="gap: 6px">
+                <h2>Mode debug</h2>
+                <label class="row" style="justify-content: flex-start; gap: 8px">
+                    <input id="debug" type="checkbox" style="width: auto">
+                    <span>Journaliser les mesures</span>
+                </label>
+                <p class="muted small">Chaque fenêtre de mesure envoyée au moteur est notée ci-dessous, et le
+                    détail (suppression comptée en correction, en reformulation ou en révision massive) s'affiche
+                    dans la console du document. Des compteurs uniquement : ni texte ni touches.</p>
+            </div>
+            <div id="debugLog" class="status muted small">Journal vide.</div>
+            <div class="actions">
+                <button type="button" id="clearLog" class="btn outlined">Vider le journal</button>
+            </div>
+        </div>
+
+        <p class="muted small">Le mot de passe n'est pas conservé : la connexion crée un jeton d'accès, gardé
+            dans le stockage local de l'extension sur cet ordinateur uniquement. Il est révoqué à la déconnexion
+            et reste révocable depuis votre espace Certimens.</p>
+    </main>
+
+    <script src="ui.js"></script>
+    <script src="options.js"></script>
+</body>
+</html>

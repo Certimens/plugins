@@ -1,0 +1,59 @@
+name: Word add-in (GitHub Pages)
+
+# Publie le site du complément Word (https://certimens.github.io/plugins/word/) **sans release**,
+# à la demande : Actions › Word add-in (GitHub Pages) › Run workflow, en choisissant la branche,
+# ou en ligne de commande :
+#
+#   gh workflow run pages.yml --ref ma-branche
+#
+# Le site publié est celui de la branche choisie ; la prochaine release (release.yml) le
+# remplacera par celui du tag. Le manifest chargé dans Word ne change pas (mêmes adresses) :
+# il n'y a rien à recharger côté Word, seulement à rouvrir le volet.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Un déploiement Pages à la fois : un essai lancé à la main et une release ne se marchent pas
+# dessus (release.yml partage ce groupe).
+concurrency:
+  group: github-pages
+
+jobs:
+  pages:
+    name: Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}word/
+    steps:
+      # fetch-depth 0: the build reads the last tag (git describe) to version the add-in.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Validate Word add-in manifest
+        run: npm run lint:word
+      - name: Site layout
+        run: mkdir site && cp -r dist/word site/word
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v5
+      - name: Summary
+        run: |
+          echo "### Complément Word publié ($(cat dist/VERSION))" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.deploy.outputs.page_url }}word/ — rouvrez le volet dans Word pour le charger." >> "$GITHUB_STEP_SUMMARY"

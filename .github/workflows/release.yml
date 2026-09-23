@@ -1,0 +1,147 @@
+name: Release
+
+# Un tag vX.Y.Z (égal à la version de extension/manifest.json) :
+# 1. relance la CI, qui construit une seule fois les paquets de tous les navigateurs ;
+# 2. crée la release GitHub avec ces paquets, nommés d'après la version, et publie le
+#    complément Word sur GitHub Pages (les manifests chargés dans Word pointent vers ce site) ;
+# 3. publie ces mêmes paquets sur chaque store (Chrome Web Store, addons.mozilla.org, Edge
+#    Add-ons, Opera Add-ons). Un store sans identifiants configurés est ignoré ; un store en
+#    échec ne bloque pas les autres (relancer son job seul).
+# La première publication dans chaque store, et toute publication Safari, se font à la main
+# (voir README).
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    with:
+      version: ${{ github.ref_name }}
+
+  github:
+    name: GitHub release
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: extension
+          path: dist
+      - uses: actions/download-artifact@v7
+        with:
+          name: safari-xcode
+          path: dist
+      - uses: actions/download-artifact@v7
+        with:
+          name: certimens-word
+          path: dist
+      - uses: actions/download-artifact@v7
+        with:
+          name: certimens-libreoffice
+          path: dist
+      - name: Name packages after the version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mkdir release
+          for package in chrome firefox safari safari-xcode; do
+            cp "dist/$package.zip" "release/certimens-agent-$version-$package.zip"
+          done
+          cp dist/libreoffice.oxt "release/certimens-agent-$version-libreoffice.oxt"
+          cp dist/word/manifest.xml "release/certimens-agent-$version-word-manifest.xml"
+          (cd release && sha256sum -- *.zip *.oxt *.xml > SHA256SUMS.txt)
+      - name: Create release
+        run: gh release create "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  # Site du complément Word : https://certimens.github.io/plugins/word/ (WORD_BASE_URL du build).
+  # Pages doit être activé une fois : Settings › Pages › Source : GitHub Actions.
+  # Hors release, le même site se publie à la demande avec pages.yml.
+  pages:
+    name: Word add-in (GitHub Pages)
+    needs: ci
+    runs-on: ubuntu-latest
+    # Un déploiement Pages à la fois : la release et un essai lancé à la main (pages.yml) ne se
+    # marchent pas dessus.
+    concurrency:
+      group: github-pages
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}word/
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: certimens-word
+          path: dist
+      - name: Site layout
+        run: mkdir site && cp -r dist/word site/word
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v5
+
+  stores:
+    name: Publish to ${{ matrix.store }}
+    needs: github
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { store: chrome, zip: chrome.zip, id: CHROME_EXTENSION_ID }
+          # Gated on the JWT issuer, not FIREFOX_EXTENSION_ID: that one is hardcoded below, so
+          # it would never be empty and the job could never skip when AMO isn't configured.
+          - { store: firefox, zip: firefox.zip, id: FIREFOX_JWT_ISSUER }
+          - { store: edge, zip: chrome.zip, id: EDGE_PRODUCT_ID }
+          - { store: opera, zip: chrome.zip, id: OPERA_PACKAGE_ID }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install
+        run: npm ci
+      - uses: actions/download-artifact@v7
+        with:
+          name: extension
+          path: dist
+      - name: Publish
+        run: |
+          if [ -z "${!STORE_ID}" ]; then
+            echo "::notice::$STORE non configuré ($STORE_ID vide) : ignoré."
+            exit 0
+          fi
+          npx publish-extension "--$STORE-zip" "dist/$ZIP"
+        env:
+          STORE: ${{ matrix.store }}
+          STORE_ID: ${{ matrix.id }}
+          ZIP: ${{ matrix.zip }}
+          # Chrome Web Store API v2, compte de service Google Cloud.
+          CHROME_API_VERSION: v2
+          CHROME_EXTENSION_ID: ${{ vars.CHROME_EXTENSION_ID }}
+          CHROME_PUBLISHER_ID: ${{ vars.CHROME_PUBLISHER_ID }}
+          CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL }}
+          CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
+          # addons.mozilla.org, clés d'API (JWT) du compte développeur.
+          FIREFOX_EXTENSION_ID: agent@certimens.fr
+          FIREFOX_CHANNEL: listed
+          FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
+          FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
+          # Edge Add-ons, API v1.1 (Partner Center › Publish API).
+          EDGE_PRODUCT_ID: ${{ vars.EDGE_PRODUCT_ID }}
+          EDGE_CLIENT_ID: ${{ vars.EDGE_CLIENT_ID }}
+          EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
+          # Opera Add-ons : pas d'API officielle, cookie de session du compte développeur.
+          OPERA_PACKAGE_ID: ${{ vars.OPERA_PACKAGE_ID }}
+          OPERA_SESSION_ID: ${{ secrets.OPERA_SESSION_ID }}

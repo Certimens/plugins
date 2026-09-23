@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Word add-in manifest (Word for Windows, Mac and Word on the web).
+  Template: scripts/build.mjs replaces {{BASE_URL}} (the address where word/'s files are
+  served) and {{VERSION}} (the version from extension/manifest.json, as X.Y.Z.0).
+  The Id must never change once the add-in is published on AppSource.
+-->
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+           xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+           xsi:type="TaskPaneApp">
+  <Id>f2b97189-a32f-4546-84e9-cce971b22597</Id>
+  <Version>{{VERSION}}</Version>
+  <ProviderName>Certimens</ProviderName>
+  <DefaultLocale>fr-FR</DefaultLocale>
+  <DisplayName DefaultValue="Certimens — Agent de rédaction"/>
+  <Description DefaultValue="Mesure la rédaction dans Word et envoie les compteurs au moteur Certimens. Aucun texte n'est enregistré."/>
+  <IconUrl DefaultValue="{{BASE_URL}}/icons/icon32.png"/>
+  <HighResolutionIconUrl DefaultValue="{{BASE_URL}}/icons/icon64.png"/>
+  <SupportUrl DefaultValue="https://certimens.fr"/>
+  <Hosts>
+    <Host Name="Document"/>
+  </Hosts>
+  <Requirements>
+    <Sets DefaultMinVersion="1.1">
+      <Set Name="WordApi" MinVersion="1.1"/>
+      <!-- Shared runtime (Microsoft 365, Word on the web): rules out Word 2016/2019, whose
+           Internet Explorer engine cannot run the add-in. -->
+      <Set Name="SharedRuntime" MinVersion="1.1"/>
+    </Sets>
+  </Requirements>
+  <DefaultSettings>
+    <SourceLocation DefaultValue="{{BASE_URL}}/taskpane.html"/>
+  </DefaultSettings>
+  <!-- Reading the text (measurements, uploaded .docx) and writing the document's settings (its identifier). -->
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Document">
+        <!-- Shared runtime: measurement continues when the task pane is closed. -->
+        <Runtimes>
+          <Runtime resid="Taskpane.Url" lifetime="long"/>
+        </Runtimes>
+        <DesktopFormFactor>
+          <GetStarted>
+            <Title resid="GetStarted.Title"/>
+            <Description resid="GetStarted.Description"/>
+            <LearnMoreUrl resid="Support.Url"/>
+          </GetStarted>
+          <FunctionFile resid="Taskpane.Url"/>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="Certimens.Group">
+                <Label resid="Group.Label"/>
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16"/>
+                  <bt:Image size="32" resid="Icon.32"/>
+                  <bt:Image size="80" resid="Icon.80"/>
+                </Icon>
+                <Control xsi:type="Button" id="Certimens.TaskpaneButton">
+                  <Label resid="Button.Label"/>
+                  <Supertip>
+                    <Title resid="Button.Label"/>
+                    <Description resid="Button.Tooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16"/>
+                    <bt:Image size="32" resid="Icon.32"/>
+                    <bt:Image size="80" resid="Icon.80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>Certimens.Taskpane</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16" DefaultValue="{{BASE_URL}}/icons/icon16.png"/>
+        <bt:Image id="Icon.32" DefaultValue="{{BASE_URL}}/icons/icon32.png"/>
+        <bt:Image id="Icon.80" DefaultValue="{{BASE_URL}}/icons/icon80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Taskpane.Url" DefaultValue="{{BASE_URL}}/taskpane.html"/>
+        <bt:Url id="Support.Url" DefaultValue="https://certimens.fr"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GetStarted.Title" DefaultValue="Certimens est prêt"/>
+        <bt:String id="Group.Label" DefaultValue="Certimens"/>
+        <bt:String id="Button.Label" DefaultValue="Certimens"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="GetStarted.Description" DefaultValue="Ouvrez Certimens depuis l'onglet Accueil pour vous connecter et associer ce document à votre espace."/>
+        <bt:String id="Button.Tooltip" DefaultValue="Connexion à Certimens, fichier du document et rendu sur un devoir."/>
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

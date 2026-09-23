@@ -1,0 +1,26 @@
+{
+  "name": "certimens-plugins",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "build": "node scripts/build.mjs",
+    "lint:firefox": "web-ext lint --source-dir dist/firefox --self-hosted=false --warnings-as-errors",
+    "build:safari": "scripts/safari.sh",
+    "word:serve": "node scripts/serve-word.mjs",
+    "lint:word": "office-addin-manifest validate dist/word/manifest.xml",
+    "test:libreoffice": "python3 -m unittest discover -s libreoffice/tests"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.11.0",
+    "globals": "17.12.0",
+    "office-addin-dev-certs": "3.0.0",
+    "office-addin-manifest": "3.0.0",
+    "publish-browser-extension": "6.1.1",
+    "web-ext": "10.7.0"
+  }
+}

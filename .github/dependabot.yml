@@ -1,0 +1,34 @@
+# Dependency updates. One entry per ecosystem present in the repository; a missing entry means
+# that ecosystem is simply never updated, which is the failure mode to watch for when adding a
+# new one (a second package.json, a Dockerfile…). Same layout as the engine's own config.
+version: 2
+updates:
+  # The build and lint toolchain (eslint, web-ext, office-addin-*, publish-browser-extension).
+  # Its lockfile is what CI installs from (npm ci), so it must stay in step.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # Patch and minor bumps land as a single PR: they are the bulk of the noise and are
+      # reviewed as a batch. Majors stay separate — they need reading.
+      npm-minor:
+        update-types: [minor, patch]
+
+  # The workflows' own actions (ci.yml, release.yml, pages.yml). Easy to forget, and the one
+  # ecosystem where a stale pin is a supply-chain concern rather than a missing feature — these
+  # workflows hold the store credentials that publish to every browser.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "chore(ci)"
+
+# The LibreOffice extension has no entry on purpose: its Python code uses the standard library
+# only (no requirements.txt), and it runs on the Python bundled with LibreOffice.

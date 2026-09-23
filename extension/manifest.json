@@ -1,0 +1,83 @@
+{
+  "manifest_version": 3,
+  "name": "Certimens — Agent de rédaction",
+  "version": "1.4.2",
+  "description": "Mesure la rédaction dans Google Docs et Word Online et envoie les compteurs au moteur Certimens. Aucun texte n'est enregistré.",
+  "homepage_url": "https://certimens.fr",
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "agent@certimens.fr",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["authenticationInfo", "websiteActivity", "websiteContent"]
+      }
+    },
+    "gecko_android": {
+      "strict_min_version": "142.0"
+    }
+  },
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "permissions": [
+    "storage",
+    "alarms"
+  ],
+
+  "host_permissions": [
+    "https://docs.google.com/document/*",
+    "https://*.googleusercontent.com/*",
+    "https://*.officeapps.live.com/*",
+    "https://*.cloud.microsoft/*",
+    "https://monespace.certimens.fr/*",
+    "https://monespace.certimens.com/*"
+  ],
+
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+
+  "background": {
+    "service_worker": "background.js",
+    "scripts": ["background.js"]
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["https://docs.google.com/document/d/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.officeapps.live.com/we/wordeditorframe.aspx*",
+        "https://*.cloud.microsoft/we/wordeditorframe.aspx*"
+      ],
+      "js": ["content.js"],
+      "all_frames": true,
+      "run_at": "document_idle"
+    }
+  ],
+
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+
+  "action": {
+    "default_title": "Certimens — Agent de rédaction",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
+  }
+}
