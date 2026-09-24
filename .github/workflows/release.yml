@@ -29,19 +29,19 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: extension
           path: dist
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: safari-xcode
           path: dist
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: certimens-word
           path: dist
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: certimens-libreoffice
           path: dist
@@ -78,7 +78,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}word/
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: certimens-word
           path: dist
@@ -112,7 +112,7 @@ jobs:
           cache: npm
       - name: Install
         run: npm ci
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: extension
           path: dist
