@@ -61,7 +61,7 @@ export default [
         rules: { 'no-unused-vars': ['error', { vars: 'local', caughtErrors: 'none' }] },
     },
     {
-        files: ['eslint.config.js', 'scripts/**/*.mjs'],
+        files: ['eslint.config.js', 'scripts/**/*.mjs', 'tests/**/*.mjs'],
         languageOptions: { globals: globals.node },
     },
 ];

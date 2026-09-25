@@ -11,8 +11,15 @@
 const FLUSH_KEYSTROKES = 200;       // flush at 200 keystrokes, like the desktop agents
 const IDLE_FLUSH_MS = 2000;         // flush after 2 s of inactivity
 const FLIGHT_MAX_MS = 800;          // beyond this, the gap between two keystrokes isn't a "flight time"
-const PAUSE_MIN_S = 3;              // cognitive pause: inactivity between 3 and 60 s then resuming
-const PAUSE_MAX_S = 60;
+const PAUSE_MIN_S = 3;              // cognitive pause: inactivity between 3 s and PAUSE_MAX_S then resuming
+// PAUSE_MAX_S bounds what counts as thinking rather than leaving. It was 60 s, which made every
+// deliberation longer than a minute count as **nothing at all** — neither a pause nor effective
+// time — although pausing one to five minutes over a paragraph is the clearest mark of someone
+// actually composing. Beyond five minutes the student has left the document, which is not
+// cognitive friction. ACTIVE_GAP_MAX_S stays at 60 s: it bounds a different rule (what a gap adds
+// to effective time), and the two were only ever the same number by accident.
+const PAUSE_MAX_S = 300;
+const ACTIVE_GAP_MAX_S = 60;       // beyond this a gap adds nothing to the effective time
 const INJECTION_MIN_CHARS = 15;     // a shorter paste isn't counted as an injection
 const VOLUME_REFRESH_MS = 30 * 1000;
 const VOLUME_TIMEOUT_MS = 5000;
@@ -126,6 +133,12 @@ let lastEventTime = 0;
 let lastActivityTime = 0;
 let isNavigating = false;
 let mouseClickedRecently = false;
+// Scope of the selection the next keystroke would replace: 'all' for a Ctrl/Cmd+A or a mouse
+// drag (a block), 'range' for a Shift+navigation selection (a targeted span), null for none.
+// Typing or pasting over a selection deletes it — a revision the sensor used to miss entirely,
+// since it only ever watched Backspace, Delete, Ctrl+X and Ctrl+Z.
+let selectionScope = null;
+let mouseDownAt = null;
 
 let idleTimer = null;
 
@@ -140,7 +153,7 @@ function markActivity(now) {
     idleTimer = setTimeout(() => flush('idle'), IDLE_FLUSH_MS);
 }
 
-// Resuming after 3 to 60 s of inactivity counts as a cognitive pause.
+// Resuming after 3 s to PAUSE_MAX_S of inactivity counts as a cognitive pause.
 function trackPause(now) {
     if (lastEventTime > 0) {
         const gapS = (now - lastEventTime) / 1000;
@@ -149,18 +162,30 @@ function trackPause(now) {
     lastEventTime = now;
 }
 
-// Effective time: the real gap if <= 2 s, a flat 250 ms if < 60 s, nothing beyond.
+// Effective time: the real gap if <= 2 s, a flat 250 ms if < ACTIVE_GAP_MAX_S, nothing beyond.
 function trackActiveTime(now) {
     if (lastActivityTime > 0) {
         const gap = now - lastActivityTime;
         if (gap <= 2000) measure.activeMs += gap;
-        else if (gap < PAUSE_MAX_S * 1000) measure.activeMs += 250;
+        else if (gap < ACTIVE_GAP_MAX_S * 1000) measure.activeMs += 250;
     }
     lastActivityTime = now;
 }
 
 function hasActivity() {
     return measure.keystrokes > 0 || measure.pasteEvents > 0;
+}
+
+// A selection about to be replaced is a deletion of everything it spans: a whole-document or
+// dragged selection weighs as a mass revision, a Shift+navigation one as a deferred
+// reformulation — the same scale the deletion keys already use. Returns true when one was spent.
+function consumeSelection() {
+    if (!selectionScope) return false;
+    if (selectionScope === 'all') measure.macroRevisions++;
+    else measure.reformulations++;
+    debugLog('sélection remplacée → %s', selectionScope === 'all' ? 'révision massive' : 'reformulation différée');
+    selectionScope = null;
+    return true;
 }
 
 // --- 2. CAPTURE ---
@@ -183,8 +208,16 @@ function onKeyDown(e) {
     const mod = e.ctrlKey || e.metaKey;
     const lower = key.length === 1 ? key.toLowerCase() : key;
 
+    // Ctrl/Cmd+A selects the whole document; Shift with a navigation key extends a selection.
+    // Shift alone must not count: it is also how capitals are typed.
+    if (mod && lower === 'a') selectionScope = 'all';
+    else if (e.shiftKey && NAV_KEYS.has(key)) selectionScope = 'range';
+
     if (key === 'Backspace' || key === 'Delete') {
-        if (mouseClickedRecently) measure.macroRevisions++;
+        // Erasing a selection is scored by what it spans, not by what preceded it.
+        if (consumeSelection()) {
+            // counted above
+        } else if (mouseClickedRecently) measure.macroRevisions++;
         else if (isNavigating) measure.reformulations++;
         else measure.corrections++;
         // The jump is spent on this deletion: what follows is erased on the spot and counts as
@@ -197,13 +230,22 @@ function onKeyDown(e) {
     } else if (NAV_KEYS.has(key)) {
         measure.navigation++;
         isNavigating = true;
+        // A navigation without Shift collapses the selection instead of extending it.
+        if (!e.shiftKey) selectionScope = null;
     } else if (!MODIFIER_KEYS.has(key)) {
+        // A character typed over a selection replaces it. Ctrl/Cmd shortcuts are excluded: they
+        // act on the selection (copy, select-all) rather than replacing it — Ctrl+X and Ctrl+V
+        // are accounted for on their own below and in the paste handler.
+        if (!mod) consumeSelection();
         isNavigating = false;
     }
     mouseClickedRecently = false;
 
-    if (mod && lower === 'x') measure.macroRevisions++;
-    if (mod && lower === 'z') measure.corrections++;
+    // Cutting or undoing settles the pending selection itself: the cut is the very deletion the
+    // selection was waiting for, and an undo collapses it. Left pending, it would be spent a
+    // second time by the next character typed or pasted — one action, two revisions.
+    if (mod && lower === 'x') { measure.macroRevisions++; selectionScope = null; }
+    if (mod && lower === 'z') { measure.corrections++; selectionScope = null; }
 
     trackActiveTime(now);
     measure.keystrokes++;
@@ -222,7 +264,25 @@ function onMouseDown(e) {
     measure.navigation++;
     isNavigating = true;
     mouseClickedRecently = true;
+    // A press collapses whatever was selected; the release decides whether a new selection was
+    // dragged (see onMouseUp).
+    selectionScope = null;
+    mouseDownAt = { x: e.clientX, y: e.clientY };
     debugLog('clic dans le document → saut de navigation');
+}
+
+// DRAG_MIN_PX separates a click from a drag: a press and release a few pixels apart is still a
+// click (the pointer always moves a little), beyond it the student swept a selection.
+const DRAG_MIN_PX = 5;
+
+function onMouseUp(e) {
+    if (!e.isTrusted || !mouseDownAt) return;
+    const moved = Math.abs(e.clientX - mouseDownAt.x) + Math.abs(e.clientY - mouseDownAt.y);
+    mouseDownAt = null;
+    if (moved < DRAG_MIN_PX) return;
+    // A dragged selection spans a block, like Ctrl/Cmd+A.
+    selectionScope = 'all';
+    debugLog('sélection à la souris');
 }
 
 function recordInjection(text) {
@@ -230,6 +290,9 @@ function recordInjection(text) {
     const now = Date.now();
     markActivity(now);
     trackPause(now);
+    // Pasting over a selection replaces it: the classic "select everything, paste the answer"
+    // used to count as an injection only, never as a revision.
+    consumeSelection();
     measure.pasteEvents++;
     const chars = [...text.replace(/[\r\n]/g, '')].length;
     if (chars > INJECTION_MIN_CHARS) measure.injectedChars += chars;
@@ -295,6 +358,7 @@ function onTopPaste(e) {
 document.addEventListener('keydown', onTopKeyDown, true);
 document.addEventListener('paste', onTopPaste, true);
 document.addEventListener('mousedown', onMouseDown, true);
+document.addEventListener('mouseup', onMouseUp, true);
 window.addEventListener('blur', onWindowBlur);
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'hidden') return;

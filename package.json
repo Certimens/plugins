@@ -7,6 +7,8 @@
   },
   "scripts": {
     "lint": "eslint .",
+    "test": "npm run test:js && npm run test:libreoffice",
+    "test:js": "node --test \"tests/**/*.test.mjs\"",
     "build": "node scripts/build.mjs",
     "lint:firefox": "web-ext lint --source-dir dist/firefox --self-hosted=false --warnings-as-errors",
     "build:safari": "scripts/safari.sh",

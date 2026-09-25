@@ -34,6 +34,8 @@ jobs:
         run: npm ci
       - name: Lint (ESLint)
         run: npm run lint
+      - name: Test (capteurs JavaScript)
+        run: npm run test:js
       # With a tag (release), it drives every package; without one, the build falls back to
       # the last tag plus the commit.
       - name: Build

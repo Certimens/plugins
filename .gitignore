@@ -2,3 +2,10 @@ node_modules/
 dist/
 .env.submit
 __pycache__/
+
+# Claude Code: CLAUDE.md and .claude/skills/ are part of the repository — they describe the
+# rules the three agents share. Only the per-machine permissions stay out.
+.claude/settings.local.json
+
+# macOS: the Safari conversion and the Word desktop tests are run from a Mac.
+.DS_Store

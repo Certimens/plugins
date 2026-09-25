@@ -94,3 +94,135 @@ class MeasureTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class SelectionReplacementTest(unittest.TestCase):
+    """Typing or pasting over a selection deletes what it spans. The sensor used to watch only
+    the erase keys, so replacing a selection cost nothing — the cheapest way to rewrite a
+    document without a single revision being counted."""
+
+    def test_typing_over_a_select_all_is_a_mass_revision(self):
+        measure = m.Measure()
+        measure.on_key(0.0, m.OTHER, ctrl=True, letter='a')
+        measure.on_key(0.2, m.OTHER)  # a character replaces the whole document
+        self.assertEqual(measure.window.macro_revisions, 1)
+        self.assertEqual(measure.window.reformulations, 0)
+
+    def test_typing_over_a_shift_selection_is_a_reformulation(self):
+        measure = m.Measure()
+        measure.on_key(0.0, m.NAVIGATION, shift=True)
+        measure.on_key(0.2, m.OTHER)
+        self.assertEqual(measure.window.reformulations, 1)
+        self.assertEqual(measure.window.macro_revisions, 0)
+
+    def test_pasting_over_a_selection_is_a_revision_and_an_injection(self):
+        measure = m.Measure()
+        measure.on_key(0.0, m.OTHER, ctrl=True, letter='a')
+        measure.on_paste(0.2, 'x' * 500)
+        self.assertEqual(measure.window.macro_revisions, 1)
+        self.assertEqual(measure.window.injected_chars, 500)
+
+    def test_erasing_a_selection_is_scored_by_its_span(self):
+        measure = m.Measure()
+        measure.on_key(0.0, m.OTHER, ctrl=True, letter='a')
+        measure.on_key(0.2, m.ERASE)
+        self.assertEqual(measure.window.macro_revisions, 1)
+        self.assertEqual(measure.window.corrections, 0)
+
+    def test_a_selection_is_spent_only_once(self):
+        measure = m.Measure()
+        measure.on_key(0.0, m.OTHER, ctrl=True, letter='a')
+        measure.on_key(0.2, m.OTHER)
+        measure.on_key(0.4, m.OTHER)
+        measure.on_key(0.6, m.OTHER)
+        self.assertEqual(measure.window.macro_revisions, 1)
+
+    def test_shift_alone_does_not_select(self):
+        """Shift is also how capitals are typed: only Shift with a navigation key selects."""
+        measure = m.Measure()
+        measure.on_key(0.0, m.OTHER, shift=True)
+        measure.on_key(0.2, m.OTHER, shift=True)
+        self.assertEqual(measure.window.macro_revisions, 0)
+        self.assertEqual(measure.window.reformulations, 0)
+
+    def test_a_plain_navigation_collapses_the_selection(self):
+        measure = m.Measure()
+        measure.on_key(0.0, m.OTHER, ctrl=True, letter='a')
+        measure.on_key(0.2, m.NAVIGATION)  # arrow without Shift: the selection is gone
+        measure.on_key(0.4, m.OTHER)
+        self.assertEqual(measure.window.macro_revisions, 0)
+
+    def test_cutting_a_selection_is_not_charged_twice(self):
+        """Ctrl+X on a selection *is* the deletion it was waiting for. Left pending, the
+        selection was spent again by the next keystroke: one cut, two mass revisions."""
+        measure = m.Measure()
+        measure.on_key(0.0, m.OTHER, ctrl=True, letter='a')
+        measure.on_key(0.2, m.OTHER, ctrl=True, letter='x')   # the cut removes the selection
+        measure.on_key(0.4, m.OTHER)                          # typing in its place
+        self.assertEqual(measure.window.macro_revisions, 1)
+
+    def test_cut_then_paste_is_one_revision(self):
+        """Moving a block (select, cut, paste elsewhere) is a single mass revision."""
+        measure = m.Measure()
+        measure.on_key(0.0, m.OTHER, ctrl=True, letter='a')
+        measure.on_key(0.2, m.OTHER, ctrl=True, letter='x')
+        measure.on_paste(0.4, 'x' * 500)
+        self.assertEqual(measure.window.macro_revisions, 1)
+
+    def test_undo_does_not_leave_a_selection_pending(self):
+        measure = m.Measure()
+        measure.on_key(0.0, m.OTHER, ctrl=True, letter='a')
+        measure.on_key(0.2, m.OTHER, ctrl=True, letter='z')
+        measure.on_key(0.4, m.OTHER)
+        self.assertEqual(measure.window.macro_revisions, 0)
+
+    def test_copying_keeps_the_selection(self):
+        """Ctrl+C does not delete anything: what is typed next still replaces the selection."""
+        measure = m.Measure()
+        measure.on_key(0.0, m.OTHER, ctrl=True, letter='a')
+        measure.on_key(0.2, m.OTHER, ctrl=True, letter='c')
+        measure.on_key(0.4, m.OTHER)
+        self.assertEqual(measure.window.macro_revisions, 1)
+
+    def test_a_click_collapses_the_selection(self):
+        measure = m.Measure()
+        measure.on_key(0.0, m.OTHER, ctrl=True, letter='a')
+        measure.on_click(0.2)
+        measure.on_key(0.4, m.OTHER)
+        self.assertEqual(measure.window.macro_revisions, 0)
+
+
+class PauseCeilingTest(unittest.TestCase):
+    """A deliberation of one to five minutes is the clearest mark of someone composing. With the
+    old 60 s ceiling it counted as nothing at all — neither a pause nor effective time."""
+
+    # The first keystroke only sets the reference; a gap is measured from it (see _pause), and a
+    # zero timestamp would read as "no previous event".
+    T0 = 1000.0
+
+    def test_a_two_minute_gap_is_a_pause(self):
+        measure = m.Measure()
+        measure.on_key(self.T0, m.OTHER)
+        measure.on_key(self.T0 + 120.0, m.OTHER)  # resumed after two minutes
+        self.assertEqual(measure.window.pauses, 1)
+
+    def test_a_break_longer_than_the_ceiling_is_not_a_pause(self):
+        measure = m.Measure()
+        measure.on_key(self.T0, m.OTHER)
+        measure.on_key(self.T0 + m.PAUSE_MAX_S + 60.0, m.OTHER)  # the student left
+        self.assertEqual(measure.window.pauses, 0)
+
+    def test_a_gap_below_the_minimum_is_typing_flow(self):
+        measure = m.Measure()
+        measure.on_key(self.T0, m.OTHER)
+        measure.on_key(self.T0 + 1.0, m.OTHER)
+        self.assertEqual(measure.window.pauses, 0)
+
+    def test_effective_time_still_stops_at_its_own_ceiling(self):
+        """Raising the pause ceiling must not credit long gaps as typing time: the two rules were
+        only ever sharing a constant by accident."""
+        measure = m.Measure()
+        measure.on_key(self.T0, m.OTHER)
+        measure.on_key(self.T0 + 120.0, m.OTHER)  # counts as a pause, but adds no effective time
+        self.assertEqual(measure.window.pauses, 1)
+        self.assertEqual(measure.window.active_ms, 0)

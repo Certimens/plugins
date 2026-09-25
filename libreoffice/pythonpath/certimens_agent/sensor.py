@@ -38,8 +38,11 @@ def _key(name):
 
 ERASE_KEYS = {_key('BACKSPACE'), _key('DELETE')}
 NAV_KEYS = {_key(n) for n in ('LEFT', 'RIGHT', 'UP', 'DOWN', 'HOME', 'END', 'PAGEUP', 'PAGEDOWN')}
-SHORTCUT_LETTERS = {_key(c.upper()): c for c in 'sxz'}
+# 'a' is Ctrl+A (select all), which the measure needs to know a selection now spans the document.
+SHORTCUT_LETTERS = {_key(c.upper()): c for c in 'asxz'}
 MOD1 = uno.getConstantByName('com.sun.star.awt.KeyModifier.MOD1')  # Ctrl, or Cmd on macOS
+# Shift, needed to tell a selection being extended from a plain cursor move.
+SHIFT = uno.getConstantByName('com.sun.star.awt.KeyModifier.SHIFT')
 
 
 def key_char(event):
@@ -229,10 +232,11 @@ class DocumentSensor:
         else:
             category = m.OTHER
         ctrl = bool(event.Modifiers & MOD1)
+        shift = bool(event.Modifiers & SHIFT)
         self.ensure_id()
         self._read_volume()
         with self.lock:
-            reason = self.measure.on_key(now, category, ctrl, SHORTCUT_LETTERS.get(code))
+            reason = self.measure.on_key(now, category, ctrl, SHORTCUT_LETTERS.get(code), shift)
         if reason:
             self.flush(reason)
         else:

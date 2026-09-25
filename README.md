@@ -178,10 +178,10 @@ L'identifiant `fr.certimens.agent` (`description.xml`) ne doit plus changer.
 | `total_keystrokes`        | Frappes (hors répétition automatique)                                  |
 | `effective_time_seconds`  | Temps de frappe effectif                                               |
 | `immediate_corrections`   | Backspace/Suppr en cours de frappe, Ctrl/Cmd+Z                         |
-| `deferred_reformulations` | **Première** Backspace/Suppr après un déplacement au clavier           |
-| `macro_revisions`         | **Première** Backspace/Suppr après un clic, Ctrl/Cmd+X                 |
+| `deferred_reformulations` | **Première** Backspace/Suppr après un déplacement au clavier, ou remplacement d'une sélection Maj+flèches |
+| `macro_revisions`         | **Première** Backspace/Suppr après un clic, Ctrl/Cmd+X, ou remplacement d'une sélection Ctrl/Cmd+A ou tracée à la souris |
 | `navigation_jumps`        | Flèches, Début/Fin, Page préc./suiv., clics dans le document          |
-| `cognitive_pauses`        | Reprises après 3 à 60 s d'inactivité                                   |
+| `cognitive_pauses`        | Reprises après 3 s à 5 min d'inactivité                                |
 | `mad_ms`                  | Écart absolu médian des flight times                                   |
 | `total_injected_chars`    | Caractères collés ou glissés (collages > 15 caractères)                |
 | `real_volume`             | Caractères du document (export texte Google Docs, sans sauts de ligne) |
@@ -196,6 +196,28 @@ comportement hérité des agents de bureau), un seul clic suffisait à faire com
 de suppressions en reformulations, et `immediate_corrections` restait à zéro chez un étudiant qui
 clique avant de corriger. Le complément Word, lui, travaille par différences de texte et n'a
 jamais eu ce biais.
+
+**Remplacer une sélection est une suppression.** Taper ou coller par-dessus une sélection efface
+tout ce qu'elle couvre : c'était jusqu'ici invisible, le capteur ne regardant que Backspace,
+Suppr, Ctrl+X et Ctrl+Z. Une sélection en cours est désormais suivie — Ctrl/Cmd+A ou un tracé à la
+souris pour un bloc, Maj + touche de déplacement pour une portion ciblée — et la frappe ou le
+collage qui la remplace est compté à cette échelle. Maj seule ne sélectionne rien (c'est aussi
+ainsi qu'on tape les majuscules), un déplacement sans Maj ou un clic annule la sélection, et elle
+n'est décomptée qu'une fois. Le cas « tout sélectionner puis coller la réponse » ne comptait
+auparavant qu'une injection, jamais une révision.
+
+Le complément Word n'est pas concerné : il travaille par différences de texte et voyait déjà le
+remplacement. L'agent LibreOffice suit la même logique que l'extension, à ceci près que son
+gestionnaire de clic ne donne pas de coordonnées — une sélection tracée à la souris n'y est donc
+pas détectable.
+
+**Une pause va de 3 s à 5 minutes.** Le plafond était à 60 s, ce qui faisait compter *rien du
+tout* — ni pause, ni temps effectif — toute délibération de plus d'une minute, alors que s'arrêter
+une à cinq minutes sur un paragraphe est justement la marque de quelqu'un qui compose. Au-delà de
+cinq minutes, l'étudiant a quitté le document : ce n'est plus de la friction cognitive. Le plafond
+du **temps effectif** reste à 60 s (`ACTIVE_GAP_MAX_S`) : c'est une autre règle, les deux ne
+partageaient la même constante que par accident. Un long silence compte donc comme une pause sans
+être crédité comme du temps de frappe.
 
 La **répétition automatique ne compte pas** : garder Suppr enfoncée pour effacer un mot vaut une
 seule suppression (c'est la définition des agents de bureau, reprise telle quelle).
@@ -265,6 +287,8 @@ La page d'options s'ouvre à l'installation : adresse du moteur (par défaut
 ```bash
 npm ci
 npm run lint          # ESLint
+npm test              # tous les tests (capteurs JavaScript et extension LibreOffice)
+npm run test:js       # tests des capteurs navigateur et Word, sans navigateur ni Word
 npm run build         # dist/chrome.zip, dist/firefox.zip, dist/safari.zip
 npm run lint:firefox  # validation addons.mozilla.org du paquet Firefox (après build)
 npm run build:safari  # macOS : projet Xcode dans dist/safari-xcode/, compilé sans signature

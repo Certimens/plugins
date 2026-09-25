@@ -9,8 +9,15 @@ LibreOffice's events; tests/test_measure.py checks it without LibreOffice.
 FLUSH_KEYSTROKES = 200      # flush at 200 keystrokes, like the desktop agents
 IDLE_FLUSH_S = 2.0          # flush after 2 s with no activity
 FLIGHT_MAX_MS = 800         # beyond this, the gap between two keystrokes is not a "flight time"
-PAUSE_MIN_S = 3             # cognitive pause: inactivity between 3 and 60 s then resuming
-PAUSE_MAX_S = 60
+PAUSE_MIN_S = 3             # cognitive pause: inactivity between 3 s and PAUSE_MAX_S then resuming
+# PAUSE_MAX_S bounds what counts as thinking rather than leaving. It was 60 s, which made every
+# deliberation longer than a minute count as *nothing at all* — neither a pause nor effective
+# time — although pausing one to five minutes over a paragraph is the clearest mark of someone
+# actually composing. Beyond five minutes the student has left the document, which is not
+# cognitive friction. ACTIVE_GAP_MAX_S stays at 60 s: it bounds a different rule (what a gap adds
+# to the effective time), and the two were only ever the same number by accident.
+PAUSE_MAX_S = 300
+ACTIVE_GAP_MAX_S = 60       # beyond this a gap adds nothing to the effective time
 INJECTION_MIN_CHARS = 15    # a shorter paste is not counted as an injection
 MAX_FLIGHTS = 500
 
@@ -70,6 +77,12 @@ class Measure:
         self.last_activity = 0
         self.is_navigating = False
         self.clicked_recently = False
+        # Scope of the selection the next keystroke would replace: 'all' for a Ctrl+A, 'range'
+        # for a Shift+navigation selection, None for none. Typing or pasting over a selection
+        # deletes it — a revision the sensor used to miss, watching only the erase keys.
+        # (extension/content.js does the same; it can also see a mouse-dragged selection, which
+        # LibreOffice's click handler does not report.)
+        self.selection_scope = None
 
     # --- activity ---
     def _mark(self, now):
@@ -78,7 +91,7 @@ class Measure:
         self.window.last = now
 
     def _pause(self, now):
-        """Resuming after 3 to 60 s of inactivity counts as a cognitive pause."""
+        """Resuming after 3 s to PAUSE_MAX_S of inactivity counts as a cognitive pause."""
         if self.last_event > 0:
             gap = now - self.last_event
             if PAUSE_MIN_S < gap <= PAUSE_MAX_S:
@@ -86,20 +99,33 @@ class Measure:
         self.last_event = now
 
     def _active_time(self, now):
-        """Effective time: the real gap if <= 2 s, a flat 250 ms if < 60 s, nothing beyond."""
+        """Effective time: the real gap if <= 2 s, a flat 250 ms if < ACTIVE_GAP_MAX_S, nothing beyond."""
         if self.last_activity > 0:
             gap_ms = (now - self.last_activity) * 1000
             if gap_ms <= 2000:
                 self.window.active_ms += gap_ms
-            elif gap_ms < PAUSE_MAX_S * 1000:
+            elif gap_ms < ACTIVE_GAP_MAX_S * 1000:
                 self.window.active_ms += 250
         self.last_activity = now
 
     def has_activity(self):
         return self.window.keystrokes > 0 or self.window.paste_events > 0
 
+    def _consume_selection(self):
+        """Spend a pending selection as the deletion it is: a whole-document one weighs as a mass
+        revision, a Shift+navigation one as a deferred reformulation — the scale the erase keys
+        already use. Returns True when one was spent."""
+        if not self.selection_scope:
+            return False
+        if self.selection_scope == 'all':
+            self.window.macro_revisions += 1
+        else:
+            self.window.reformulations += 1
+        self.selection_scope = None
+        return True
+
     # --- events ---
-    def on_key(self, now, category, ctrl=False, letter=None):
+    def on_key(self, now, category, ctrl=False, letter=None, shift=False):
         """Key pressed (excluding auto-repeat). letter: 's', 'x', 'z'… with Ctrl/Cmd."""
         w = self.window
         self._mark(now)
@@ -112,8 +138,18 @@ class Measure:
                     w.flights.pop(0)
         self.last_press = now
 
+        # Ctrl+A selects the whole document; Shift with a navigation key extends a selection.
+        # Shift alone must not count: it is also how capitals are typed.
+        if ctrl and letter == 'a':
+            self.selection_scope = 'all'
+        elif shift and category == NAVIGATION:
+            self.selection_scope = 'range'
+
         if category == ERASE:
-            if self.clicked_recently:
+            # Erasing a selection is scored by what it spans, not by what preceded it.
+            if self._consume_selection():
+                pass
+            elif self.clicked_recently:
                 w.macro_revisions += 1
             elif self.is_navigating:
                 w.reformulations += 1
@@ -125,14 +161,26 @@ class Measure:
         elif category == NAVIGATION:
             w.navigation += 1
             self.is_navigating = True
+            # A navigation without Shift collapses the selection instead of extending it.
+            if not shift:
+                self.selection_scope = None
         elif category != MODIFIER:
+            # A character typed over a selection replaces it. Ctrl shortcuts act on the selection
+            # (copy, select-all) rather than replacing it, so they are excluded.
+            if not ctrl:
+                self._consume_selection()
             self.is_navigating = False
         self.clicked_recently = False
 
+        # Cutting or undoing settles the pending selection itself: the cut is the very deletion
+        # the selection was waiting for, and an undo collapses it. Left pending, it would be
+        # spent a second time by the next character typed or pasted — one action, two revisions.
         if ctrl and letter == 'x':
             w.macro_revisions += 1
+            self.selection_scope = None
         if ctrl and letter == 'z':
             w.corrections += 1
+            self.selection_scope = None
 
         self._active_time(now)
         w.keystrokes += 1
@@ -149,6 +197,10 @@ class Measure:
         self.window.navigation += 1
         self.is_navigating = True
         self.clicked_recently = True
+        # A click collapses whatever was selected. LibreOffice's handler reports no coordinates,
+        # so a dragged selection cannot be told from a plain click here — unlike the browser
+        # sensor, which measures the drag distance.
+        self.selection_scope = None
 
     def on_paste(self, now, text):
         """Paste (menu, shortcut or right-click): text is the clipboard's text."""
@@ -156,6 +208,9 @@ class Measure:
             return
         self._mark(now)
         self._pause(now)
+        # Pasting over a selection replaces it: "select everything, paste the answer" used to
+        # count as an injection only, never as a revision.
+        self._consume_selection()
         self.window.paste_events += 1
         chars = len(text.replace('\r', '').replace('\n', ''))
         if chars > INJECTION_MIN_CHARS:
