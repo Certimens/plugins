@@ -22,63 +22,64 @@
     </div>
 
     <form id="login" class="card stack" hidden>
-        <p class="muted">Connectez-vous à votre espace Certimens.</p>
+        <p class="muted" data-i18n="login.intro"></p>
         <div class="field">
-            <label for="email">E-mail</label>
+            <label for="email" data-i18n="login.email"></label>
             <input id="email" type="email" required autocomplete="username">
         </div>
         <div class="field">
-            <label for="password">Mot de passe</label>
+            <label for="password" data-i18n="login.password"></label>
             <input id="password" type="password" required autocomplete="current-password">
         </div>
         <div class="field">
-            <label for="engineUrl">Adresse du moteur</label>
+            <label for="engineUrl" data-i18n="login.engineUrl"></label>
             <input id="engineUrl" type="url" required placeholder="https://monespace.certimens.fr">
         </div>
-        <button type="submit" class="btn block">Se connecter</button>
+        <button type="submit" class="btn block" data-i18n="login.submit"></button>
     </form>
 
     <div id="account" class="stack" style="gap: 12px" hidden>
         <div class="row small">
-            <span class="muted">Connecté : <strong id="who" style="color: var(--text)"></strong></span>
-            <button type="button" id="logout" class="link small">Se déconnecter</button>
+            <span class="muted"><span data-i18n="account.connected"></span> <strong id="who" style="color: var(--text)"></strong></span>
+            <button type="button" id="logout" class="link small" data-i18n="account.logout"></button>
         </div>
 
         <div class="card stack">
-            <div class="muted small">Document ouvert</div>
+            <div class="muted small" data-i18n="doc.open"></div>
             <div id="linked" class="stack" style="gap: 6px" hidden>
                 <h2 id="linkedName"></h2>
-                <div class="alert ok small">Fichier Certimens associé : les mesures y sont envoyées.</div>
+                <div class="alert ok small" data-i18n="doc.linked"></div>
                 <div id="submitted" class="muted small" hidden></div>
-                <a id="open" class="small" target="_blank" rel="noopener">Ouvrir dans Certimens</a>
+                <a id="open" class="small" target="_blank" rel="noopener" data-i18n="doc.openInCertimens"></a>
                 <div class="stack" style="gap: 6px; margin-top: 6px">
-                    <button type="button" id="uploadDocx" class="btn outlined block">Envoyer le .docx</button>
+                    <button type="button" id="uploadDocx" class="btn outlined block" data-i18n="upload.sendDocx"></button>
                     <div id="uploadHint" class="muted small"></div>
                 </div>
             </div>
             <form id="create" class="stack" hidden>
                 <div class="field">
-                    <label for="documentName">Nom du fichier</label>
+                    <label for="documentName" data-i18n="doc.name"></label>
                     <input id="documentName" required>
                 </div>
             </form>
             <div id="assignmentBox" class="field" hidden>
-                <label for="assignment">Devoir</label>
+                <label for="assignment" data-i18n="assignment.label"></label>
                 <select id="assignment"></select>
             </div>
-            <button type="submit" form="create" id="createBtn" class="btn block" hidden>Créer le fichier</button>
-            <button type="button" id="submit" class="btn block" hidden>Rendre sur ce devoir</button>
+            <button type="submit" form="create" id="createBtn" class="btn block" hidden data-i18n="doc.create"></button>
+            <button type="button" id="submit" class="btn block" hidden></button>
         </div>
     </div>
 
     <div id="message" class="alert small"></div>
 
-    <div id="sync" class="muted small"></div>
-    <div id="webNote" class="muted small" hidden>
-        Sur Word pour le web, l'extension navigateur Certimens mesure déjà la rédaction : n'utilisez
-        que l'un des deux, sinon l'activité est comptée deux fois.
-    </div>
+    <div id="pausedAlert" class="alert error small" hidden data-i18n="pause.alert"></div>
+    <button type="button" id="pause" class="btn outlined block" hidden></button>
 
+    <div id="sync" class="muted small"></div>
+    <div id="webNote" class="muted small" hidden data-i18n="word.webNote"></div>
+
+    <script src="i18n.js"></script>
     <script src="ui.js"></script>
     <script src="agent.js"></script>
     <script src="sensor.js"></script>

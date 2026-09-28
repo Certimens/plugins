@@ -74,3 +74,20 @@ ligne avec un `curl` sur `…/plugins/word/manifest.xml` avant de soupçonner le
 Sur Word pour le web, le complément et l'extension navigateur mesurent la même rédaction. Le
 volet le rappelle à l'étudiant ; toute évolution de l'un ne doit pas faire disparaître cet
 avertissement.
+
+## Mesure suspendue
+
+`isPaused()` relit `localStorage` **à chaque appel**, sans cache : chaque document ouvert a son
+instance du complément, elles partagent cette origine mais pas leur mémoire, et une pause décidée
+dans l'une doit atteindre les capteurs des autres.
+
+La relecture du texte, elle, **continue** pendant la pause : `pendingEvents` reste vide, donc rien
+n'est compté, mais la référence se rafraîchit (`BASELINE_REFRESH_MS`). Sans cela, tout ce qui a
+été écrit pendant la pause serait compté comme une injection géante à la reprise.
+
+## Langues
+
+Le volet n'a pas de dictionnaire à lui : il charge `i18n.js` de l'extension, que le build copie
+dans `dist/word/`. Le manifest, lui, est traduit par Office (`<Override Locale="en-us">` sur
+`DisplayName`, `Description` et les `bt:String`), d'après la langue d'Office et non celle du
+compte Certimens. Règle complète : skill `langues-interface`.

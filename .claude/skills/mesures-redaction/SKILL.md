@@ -1,25 +1,31 @@
 ---
 name: mesures-redaction
-description: Définitions partagées des mesures de rédaction (fenêtres, compteurs, metrics envoyées au moteur) implémentées trois fois — extension navigateur, complément Word, extension LibreOffice. À charger avant toute modification d'un capteur, d'une constante de mesure, d'une règle de comptage ou d'une metric, et avant d'expliquer ce que compte un agent.
+description: Définitions partagées des mesures de rédaction (fenêtres, compteurs, metrics envoyées au moteur) implémentées quatre fois — extension navigateur, complément Word, extension LibreOffice, extension VS Code. À charger avant toute modification d'un capteur, d'une constante de mesure, d'une règle de comptage ou d'une metric, et avant d'expliquer ce que compte un agent.
 ---
 
 # Mesures de rédaction
 
-Une seule définition, trois implémentations indépendantes :
+Une seule définition, quatre implémentations indépendantes :
 
 | Implémentation | Fenêtres de mesure | Capteur |
 | --- | --- | --- |
 | Extension navigateur | `extension/content.js` | le même fichier (clavier/souris) |
 | Complément Word | `word/sensor.js` | le même fichier (différences de texte) |
 | Extension LibreOffice | `libreoffice/pythonpath/certimens_agent/measure.py` | `sensor.py` (UNO) |
+| Extension VS Code | `vscode/sensor.js` | le même fichier (modifications du document) |
 
-**Une règle changée dans l'une doit l'être dans les deux autres**, ou être justifiée par une
+**Une règle changée dans l'une doit l'être dans les trois autres**, ou être justifiée par une
 limite de la plateforme (voir *Écarts assumés*). Le tableau des metrics du `README.md`
 (section *Metrics envoyées*) est la référence lisible : il se met à jour dans le même commit.
 
 ## Constantes communes
 
 Identiques dans les trois fichiers, à ne pas désynchroniser :
+
+Les trois premières implémentations comptent une frappe par touche ou par caractère ; VS Code,
+lui, ajoute une constante qui n'a de sens que chez lui, `SELECTION_ECHO_MS` (50 ms) : l'éditeur
+signale un déplacement du curseur après chaque frappe, et sans ce délai `navigation_jumps`
+suivrait exactement `total_keystrokes`.
 
 | Constante | Valeur | Ce qu'elle borne |
 | --- | --- | --- |
@@ -46,6 +52,35 @@ ne pas les réunifier.
 - **La répétition automatique ne compte pas** : Suppr maintenue = une suppression.
 - La période d'une fenêtre va de la première à la dernière activité : le temps mort n'y entre
   jamais.
+
+## Suspension de la mesure
+
+Les quatre agents ont un bouton qui **suspend la mesure**. Quatre règles, identiques partout :
+
+- **Elle suspend la mesure, pas l'envoi.** La file continue de partir : ce qui a été mesuré avant
+  la pause appartient déjà au moteur, et le retenir ne ferait que transformer une pause en un lot
+  tardif — `late_ingestion` et `multi_window_batch` côté moteur.
+- **La fenêtre en cours est vidée au moment de suspendre.** Rien de mesuré n'est perdu, et rien
+  ne s'accumule derrière un capteur suspendu.
+- **Pendant la suspension, aucun événement n'est compté** : pas de fenêtre ouverte, pas de temps
+  effectif, pas de pause cognitive. Ce n'est pas « mesurer sans envoyer ».
+- **Elle est explicite et elle dure** : elle survit au redémarrage de l'éditeur, et seule une
+  reprise explicite la lève. Un agent qui reprendrait tout seul serait pire que pas de pause du
+  tout — l'étudiant se croirait mesuré sans l'être. Pour la même raison, l'état est affiché en
+  permanence (badge, barre d'état, volet), jamais seulement au moment du clic.
+
+L'état est **global à l'agent**, pas par document : c'est l'étudiant qui suspend, pas un fichier.
+
+| Implémentation | Où l'état est gardé | Où les événements sont filtrés |
+| --- | --- | --- |
+| Extension navigateur | `chrome.storage.local`, clé `paused` | `extension/content.js` (chaque gestionnaire, et `recordInjection`) |
+| Complément Word | `localStorage` partagé, `isPaused()` d'`agent.js` | `word/sensor.js` (`noteLocalEvent`, `onSelectionChanged`) |
+| Extension LibreOffice | `certimens.json`, `Engine.paused()` | `sensor.py` (`on_key`, `on_click`, `on_paste`, `on_deactivated`) |
+| Extension VS Code | `globalState`, `Agent.paused()` | `vscode/extension.js` (les gestionnaires de l'hôte) |
+
+Le complément Word est le seul cas où la lecture du document **continue** pendant la pause : son
+capteur travaille par différences, et sans rafraîchir sa référence, tout ce qui a été écrit
+pendant la pause atterrirait d'un coup dans la première fenêtre d'après (voir `BASELINE_REFRESH_MS`).
 
 ## Invariant de confidentialité
 
@@ -78,6 +113,14 @@ le moteur d'abord, les agents ensuite, avec la dégradation ci-dessus.
 - **LibreOffice** : mêmes metrics et mêmes définitions que l'extension, flight times compris
   (`XUserInputInterception` donne clavier et souris) ; seule exception, son gestionnaire de clic
   ne donne pas de coordonnées, donc une sélection **tracée à la souris** n'y est pas détectable.
+- **VS Code** : pas de `paste_events`. Une insertion faite en un coup y est un collage, un
+  extrait de code ou une complétion acceptée (IntelliSense, assistant), et l'API ne dit pas
+  laquelle : les caractères comptent dans `total_injected_chars`, le *nombre* de collages serait
+  faux. Pour la même raison les flight times ne retiennent que les modifications de la taille
+  d'une frappe. Tout le reste est mesuré, y compris `focus_losses` (la fenêtre de l'éditeur perd
+  le focus) et les trois cases de révision : une modification porte la longueur de ce qu'elle
+  efface, et l'origine du déplacement précédent (clavier, souris, commande) est connue. Une
+  frappe y est un caractère inséré ou effacé, comme dans Word.
 
 ## Vérifier
 
@@ -89,18 +132,19 @@ des règles ci-dessus : une règle qui change s'y voit d'abord.
 | Extension navigateur | `tests/extension-sensor.test.mjs` |
 | Complément Word | `tests/word-sensor.test.mjs` |
 | Extension LibreOffice | `libreoffice/tests/test_measure.py` |
+| Extension VS Code | `tests/vscode-sensor.test.mjs` |
 
 Les tests JavaScript chargent le fichier livré tel quel dans un contexte isolé
 (`tests/helpers/sandbox.mjs`) : **rien n'est ajouté au code de production pour le rendre
 testable**, et l'horloge est pilotée par le test, sans quoi les règles de pause et de temps
 effectif ne seraient pas mesurables.
 
-Une règle commune ajoutée ou changée se teste des deux côtés — les cas sont volontairement les
-mêmes d'une suite à l'autre, c'est ce qui rend une divergence visible.
+Une règle commune ajoutée ou changée se teste dans chaque suite — les cas sont volontairement les
+mêmes de l'une à l'autre, c'est ce qui rend une divergence visible.
 
 ```bash
-npm test                   # les deux suites
-npm run test:js            # capteurs navigateur et Word (node --test, sans dépendance)
+npm test                   # toutes les suites
+npm run test:js            # capteurs navigateur, Word et VS Code (node --test, sans dépendance)
 npm run test:libreoffice   # python3 -m unittest discover -s libreoffice/tests
 npm run lint               # ESLint sur extension/, word/, scripts/ et tests/
 ```

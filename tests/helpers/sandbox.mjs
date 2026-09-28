@@ -45,8 +45,17 @@ function inertTimers() {
     return { setTimeout: noop, clearTimeout: () => {}, setInterval: noop, clearInterval: () => {} };
 }
 
-export function browserGlobals(time, { hostname = 'docs.google.com', href, title = 'Mémoire - Google Docs' } = {}) {
+/**
+ * Browser globals for a content script.
+ *
+ * `stored` is what `chrome.storage.local` already holds when the script loads — the sensor reads
+ * its suspended state from there, so a page opened during a pause has to start suspended too.
+ * The returned `storage.change()` replays what the browser would deliver when another part of
+ * the extension writes that key.
+ */
+export function browserGlobals(time, { hostname = 'docs.google.com', href, title = 'Mémoire - Google Docs', stored = {} } = {}) {
     const listeners = new Map();
+    let onStorageChanged = null;
     const document = {
         title,
         visibilityState: 'visible',
@@ -58,8 +67,17 @@ export function browserGlobals(time, { hostname = 'docs.google.com', href, title
         getElementById: () => null,
         hasFocus: () => true,
     };
+    const storage = {
+        change(values) {
+            if (!onStorageChanged) return;
+            const changes = {};
+            for (const [key, newValue] of Object.entries(values)) changes[key] = { newValue };
+            onStorageChanged(changes, 'local');
+        },
+    };
     return {
         listeners,
+        storage,
         globals: {
             document,
             location: { hostname, href: href ?? `https://${hostname}/document/d/AbC-123_xyz/edit`, search: '' },
@@ -72,8 +90,8 @@ export function browserGlobals(time, { hostname = 'docs.google.com', href, title
             Element: class Element {},
             chrome: {
                 storage: {
-                    local: { get: () => Promise.resolve({}), set: () => Promise.resolve() },
-                    onChanged: { addListener: () => {} },
+                    local: { get: () => Promise.resolve({ ...stored }), set: () => Promise.resolve() },
+                    onChanged: { addListener: (fn) => { onStorageChanged = fn; } },
                 },
                 runtime: {
                     sendMessage: () => Promise.resolve({ ok: false }),

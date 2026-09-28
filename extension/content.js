@@ -37,10 +37,28 @@ function debugLog(...args) {
     if (debug) console.log('[Certimens]', ...args);
 }
 
+// --- SUSPENDED MEASUREMENT ---
+// Switched from the popup, and read here rather than pushed: every document open in the browser
+// must follow the same state, and a page loaded after the pause must start suspended too.
+//
+// Suspending stops the *measurement*, not the sending: the window in progress is flushed on the
+// way in, and the queue keeps draining. What was measured before the pause is already the
+// engine's; holding it back would only turn a pause into a late, suspicious batch.
+let paused = false;
+
 try {
-    chrome.storage.local.get('debug').then(({ debug: on }) => { debug = !!on; }, () => {});
+    chrome.storage.local.get(['debug', 'paused']).then(({ debug: on, paused: off }) => {
+        debug = !!on;
+        paused = !!off;
+    }, () => {});
     chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === 'local' && changes.debug) debug = !!changes.debug.newValue;
+        if (area !== 'local') return;
+        if (changes.debug) debug = !!changes.debug.newValue;
+        if (changes.paused) {
+            paused = !!changes.paused.newValue;
+            debugLog(paused ? 'mesure suspendue' : 'mesure reprise');
+            if (paused) flush('pause');
+        }
     });
 } catch (_) { /* extension reloaded: the page keeps measuring without the debug mode */ }
 
@@ -190,7 +208,7 @@ function consumeSelection() {
 
 // --- 2. CAPTURE ---
 function onKeyDown(e) {
-    if (e.repeat || !e.isTrusted) return;
+    if (paused || e.repeat || !e.isTrusted) return;
     const now = Date.now();
     markActivity(now);
     trackPause(now);
@@ -255,7 +273,7 @@ function onKeyDown(e) {
 }
 
 function onMouseDown(e) {
-    if (!e.isTrusted) return;
+    if (paused || !e.isTrusted) return;
     // Only clicks in the document body are navigation jumps (not the menus).
     if (e.target instanceof Element && !e.target.closest(editor.editorArea)) return;
     const now = Date.now();
@@ -276,7 +294,7 @@ function onMouseDown(e) {
 const DRAG_MIN_PX = 5;
 
 function onMouseUp(e) {
-    if (!e.isTrusted || !mouseDownAt) return;
+    if (paused || !e.isTrusted || !mouseDownAt) return;
     const moved = Math.abs(e.clientX - mouseDownAt.x) + Math.abs(e.clientY - mouseDownAt.y);
     mouseDownAt = null;
     if (moved < DRAG_MIN_PX) return;
@@ -286,7 +304,7 @@ function onMouseUp(e) {
 }
 
 function recordInjection(text) {
-    if (!text) return;
+    if (paused || !text) return;
     const now = Date.now();
     markActivity(now);
     trackPause(now);
@@ -300,18 +318,19 @@ function recordInjection(text) {
 }
 
 function onPaste(e) {
-    if (!e.isTrusted || !e.clipboardData) return;
+    if (paused || !e.isTrusted || !e.clipboardData) return;
     recordInjection(e.clipboardData.getData('text/plain'));
 }
 
 function onDrop(e) {
-    if (!e.isTrusted || !e.dataTransfer) return;
+    if (paused || !e.isTrusted || !e.dataTransfer) return;
     recordInjection(e.dataTransfer.getData('text/plain'));
 }
 
 // The student really leaves the document (another tab, another window, address bar). A
 // focus shift from the page to the editing iframe doesn't count: hasFocus() stays true.
 function onWindowBlur() {
+    if (paused) return;
     setTimeout(() => {
         if (document.hasFocus()) return;
         if (editor.blurMeansLeaving) measure.focusLosses++;
@@ -361,12 +380,14 @@ document.addEventListener('mousedown', onMouseDown, true);
 document.addEventListener('mouseup', onMouseUp, true);
 window.addEventListener('blur', onWindowBlur);
 document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'hidden') return;
+    if (paused || document.visibilityState !== 'hidden') return;
     if (!editor.blurMeansLeaving) measure.focusLosses++;
     debugLog('page masquée, sortie comptée : %s', !editor.blurMeansLeaving);
     flush('hidden');
 });
-window.addEventListener('pagehide', () => flush('pagehide'));
+window.addEventListener('pagehide', () => {
+    if (!paused) flush('pagehide');
+});
 
 scanEditorIframes();
 let scanScheduled = false;

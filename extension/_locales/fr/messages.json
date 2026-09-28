@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "Certimens — Agent de rédaction",
+    "description": "Nom affiché dans le navigateur et dans la boutique."
+  },
+  "extensionDescription": {
+    "message": "Mesure la rédaction dans Google Docs et Word Online et envoie les compteurs au moteur Certimens. La frappe et les collages ne sont comptés que sous forme de chiffres ; le document lui-même n'est envoyé que lorsque vous le déposez.",
+    "description": "Description de la fiche : 132 caractères au maximum (limite du Chrome Web Store)."
+  }
+}

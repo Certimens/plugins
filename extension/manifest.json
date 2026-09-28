@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Certimens — Agent de rédaction",
+  "name": "__MSG_extensionName__",
   "version": "1.4.2",
-  "description": "Mesure la rédaction dans Google Docs et Word Online et envoie les compteurs au moteur Certimens. Aucun texte n'est enregistré.",
+  "default_locale": "fr",
+  "description": "__MSG_extensionDescription__",
   "homepage_url": "https://certimens.fr",
 
   "browser_specific_settings": {
@@ -46,7 +47,7 @@
 
   "background": {
     "service_worker": "background.js",
-    "scripts": ["background.js"]
+    "scripts": ["i18n.js", "background.js"]
   },
 
   "content_scripts": [
@@ -72,7 +73,7 @@
   },
 
   "action": {
-    "default_title": "Certimens — Agent de rédaction",
+    "default_title": "__MSG_extensionName__",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",

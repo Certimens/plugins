@@ -17,6 +17,8 @@ import urllib.request
 import uuid
 from datetime import datetime, timezone
 
+from .i18n import set_language, t
+
 DEFAULT_ENGINE_URL = 'https://monespace.certimens.fr'
 RETRY_S = 60
 MAX_QUEUE = 5000
@@ -61,7 +63,7 @@ class Engine:
     # --- 1. STORAGE ---
     def _load(self):
         state = {'config': {}, 'files': {}, 'titles': {}, 'syncedTitles': {}, 'queue': [],
-                 'status': {'state': 'idle'}, 'extendedUnsupported': False}
+                 'status': {'state': 'idle'}, 'extendedUnsupported': False, 'paused': False}
         try:
             with open(self.path, encoding='utf-8') as f:
                 state.update(json.load(f))
@@ -83,7 +85,10 @@ class Engine:
         # identifier, used to revoke it at logout. password: legacy setting, migrated on the
         # next send (see authed_config).
         with self.lock:
-            return {'engineUrl': DEFAULT_ENGINE_URL, 'email': '', 'token': '', 'tokenId': '', **self.state['config']}
+            # language: the account's own, sent by the engine at login, so every window opens in
+            # the language the student chose in their Certimens space.
+            return {'engineUrl': DEFAULT_ENGINE_URL, 'email': '', 'token': '', 'tokenId': '',
+                    'language': '', **self.state['config']}
 
     @staticmethod
     def _has_auth(config):
@@ -96,6 +101,23 @@ class Engine:
 
     def logged_in(self):
         return self._has_auth(self.config()) and self.status()[0]['state'] != 'auth_error'
+
+    def paused(self):
+        """Whether the measurement is suspended. Held here because it is shared by every open
+        document, and persisted because a suspension that quietly lifted itself at the next start
+        would be worse than none: the student would believe they are measured when they are not.
+
+        It suspends the *measurement*, not the sending — the queue keeps draining, since what was
+        measured before the pause is already the engine's."""
+        with self.lock:
+            return bool(self.state['paused'])
+
+    def set_paused(self, paused):
+        with self.lock:
+            self.state['paused'] = bool(paused)
+            self._save()
+        for listener in list(self.listeners):
+            listener()
 
     def file_id(self, document_id):
         with self.lock:
@@ -144,7 +166,7 @@ class Engine:
         is revoked. Returns (me, token, token_id)."""
         url = trim_url(engine_url or DEFAULT_ENGINE_URL)
         me = self._request('POST', url + '/api/auth/login', {'email': email, 'password': password})
-        label = 'Extension LibreOffice (%s)' % datetime.now().strftime('%d/%m/%Y')
+        label = t('token.libreoffice', date=datetime.now().strftime('%d/%m/%Y'))
         token = self._request('POST', url + '/api/auth/tokens', {'label': label}, me['token'])
         try:
             self._request('POST', url + '/api/auth/logout', None, me['token'])
@@ -173,7 +195,7 @@ class Engine:
     def _migrate(self, config):
         me, token, token_id = self._create_api_token(config['engineUrl'], config['email'], config['password'])
         migrated = {'engineUrl': trim_url(config['engineUrl']), 'email': me.get('email') or config['email'],
-                    'token': token, 'tokenId': token_id}
+                    'token': token, 'tokenId': token_id, 'language': me.get('language') or ''}
         with self.lock:
             self.state['config'] = migrated
             self._save()
@@ -183,9 +205,12 @@ class Engine:
         """The password is exchanged for an API token, the only thing kept (the engine only
         grants it if the credentials are valid)."""
         me, token, token_id = self._create_api_token(engine_url, email, password)
+        # From here on every window speaks the account's language, not the editor's.
+        set_language(me.get('language'))
         with self.lock:
             self.state['config'] = {'engineUrl': trim_url(engine_url or DEFAULT_ENGINE_URL),
-                                    'email': me.get('email') or email, 'token': token, 'tokenId': token_id}
+                                    'email': me.get('email') or email, 'token': token,
+                                    'tokenId': token_id, 'language': me.get('language') or ''}
             # A new engine may well know the extended metrics the previous one refused.
             self.state['extendedUnsupported'] = False
         self._set_status({'state': 'idle'})  # clears any auth_error before the next send
@@ -200,7 +225,8 @@ class Engine:
             except HttpError:
                 pass  # already revoked or offline: the local token is erased anyway
         with self.lock:
-            self.state['config'] = {'engineUrl': config['engineUrl'], 'email': config['email']}
+            self.state['config'] = {'engineUrl': config['engineUrl'], 'email': config['email'],
+                                    'language': config.get('language', '')}
         self._set_status({'state': 'unconfigured'})
 
     def _ensure_file(self, config, document_id, document_name, editor_title=None):

@@ -1,7 +1,9 @@
 # AppSource (Partner Center) — fiche du complément Word
 
 Textes à copier dans l'offre *Complément Office* du Partner Center. Ils décrivent ce que fait le
-code actuel (`word/`) : à revoir si le complément change. Les formats d'images et limites de
+code actuel (`word/`) : à revoir si le complément change. Le manifest porte déjà le nom et la
+description en anglais (`<Override Locale="en-us">`) ; la fiche AppSource, elle, se remplit langue
+par langue dans le Partner Center. Les formats d'images et limites de
 longueur sont affichés par le Partner Center à côté de chaque champ : s'y fier en cas d'écart.
 
 ## Nom

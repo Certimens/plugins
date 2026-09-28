@@ -45,6 +45,10 @@ jobs:
         with:
           name: certimens-libreoffice
           path: dist
+      - uses: actions/download-artifact@v7
+        with:
+          name: certimens-vscode
+          path: dist
       - name: Name packages after the version
         run: |
           version="${GITHUB_REF_NAME#v}"
@@ -53,8 +57,9 @@ jobs:
             cp "dist/$package.zip" "release/certimens-agent-$version-$package.zip"
           done
           cp dist/libreoffice.oxt "release/certimens-agent-$version-libreoffice.oxt"
+          cp dist/certimens-vscode.vsix "release/certimens-agent-$version-vscode.vsix"
           cp dist/word/manifest.xml "release/certimens-agent-$version-word-manifest.xml"
-          (cd release && sha256sum -- *.zip *.oxt *.xml > SHA256SUMS.txt)
+          (cd release && sha256sum -- *.zip *.oxt *.vsix *.xml > SHA256SUMS.txt)
       - name: Create release
         run: gh release create "$GITHUB_REF_NAME" release/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
         env:
@@ -89,6 +94,35 @@ jobs:
           path: site
       - id: deploy
         uses: actions/deploy-pages@v5
+
+  # Visual Studio Marketplace : un seul paquet, publié avec le jeton (PAT) de l'éditeur. Open VSX
+  # (VSCodium, Cursor, Gitpod) n'a pas d'API gratuite pour un éditeur vérifié : sa publication
+  # reste manuelle, comme celle de Safari (voir README).
+  marketplace:
+    name: Publish to VS Code Marketplace
+    needs: github
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install
+        run: npm ci
+      - uses: actions/download-artifact@v7
+        with:
+          name: certimens-vscode
+          path: dist
+      - name: Publish
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "::notice::VS Code Marketplace non configuré (VSCE_PAT vide) : ignoré."
+            exit 0
+          fi
+          npx vsce publish --packagePath dist/certimens-vscode.vsix
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
   stores:
     name: Publish to ${{ matrix.store }}

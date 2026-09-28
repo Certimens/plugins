@@ -81,3 +81,19 @@ npm run lint           # ESLint
 npm run build          # dist/{chrome,firefox,safari}.zip, dist/word/, dist/libreoffice.oxt
 npm run lint:firefox   # validation AMO du paquet Firefox (après build)
 ```
+
+## Mesure suspendue
+
+La clé `paused` de `chrome.storage.local` est lue par `content.js` **dans chaque page** (elle
+n'est pas poussée : une page ouverte pendant la pause doit démarrer suspendue) et par
+`background.js` pour le badge `II`. La règle commune est dans `mesures-redaction` ; ici, le piège
+est d'ajouter un gestionnaire d'événement sans sa garde — `recordInjection` en porte une, parce
+que c'est là que le comptage a lieu.
+
+## Langues
+
+`extension/i18n.js` porte les textes de l'interface (partagé avec le complément Word, copié par
+le build), `_locales/{fr,en}/messages.json` ceux que le navigateur et la boutique lisent avant
+notre code — d'où `__MSG_extensionName__` et `default_locale` dans le manifest. Le service worker
+charge le dictionnaire par `importScripts` ; Firefox le charge par `background.scripts`, où
+`importScripts` n'existe pas. Règle complète : skill `langues-interface`.

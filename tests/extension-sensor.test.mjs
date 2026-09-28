@@ -11,9 +11,9 @@ import { browserGlobals, clock, load } from './helpers/sandbox.mjs';
 
 const INTERNALS = ['measure', 'onKeyDown', 'onMouseDown', 'onMouseUp', 'recordInjection', 'flush', 'selectionScope'];
 
-function sensor({ hostname = 'docs.google.com' } = {}) {
+function sensor({ hostname = 'docs.google.com', stored } = {}) {
     const time = clock();
-    const { globals } = browserGlobals(time, { hostname });
+    const { globals, storage } = browserGlobals(time, { hostname, stored });
     const internals = load('extension/content.js', { globals, expose: INTERNALS });
     const press = (key, modifiers = {}) => {
         internals.onKeyDown({ key, isTrusted: true, repeat: false, ctrlKey: false, metaKey: false, shiftKey: false, ...modifiers });
@@ -22,6 +22,10 @@ function sensor({ hostname = 'docs.google.com' } = {}) {
     return {
         time,
         press,
+        storage,
+        // The sensor reads its suspended state asynchronously at load: one turn of the microtask
+        // queue is what it takes for the answer to arrive.
+        settled: () => Promise.resolve(),
         type: (count = 1) => {
             for (let i = 0; i < count; i++) press('a');
         },
@@ -224,5 +228,41 @@ test('une pause va de 3 s à 5 minutes', async (t) => {
         s.type();
         assert.equal(s.counters.pauses, 1);
         assert.equal(s.counters.activeMs, before, 'un long silence ne se crédite pas en temps de frappe');
+    });
+});
+
+test('la mesure suspendue', async (t) => {
+    await t.test('ne compte rien quand elle est déjà suspendue au chargement', async () => {
+        // A document opened during a pause must start suspended, not measure until it is told.
+        const s = sensor({ stored: { paused: true } });
+        await s.settled();
+        s.type(5);
+        s.click();
+        s.paste('un texte collé pendant la pause');
+        assert.equal(s.counters.keystrokes, 0);
+        assert.equal(s.counters.injectedChars, 0);
+        assert.equal(s.counters.navigation, 0);
+    });
+
+    await t.test('vide la fenêtre en cours au moment où elle est suspendue', async () => {
+        const s = sensor();
+        await s.settled();
+        s.type(3);
+        assert.equal(s.counters.keystrokes, 3);
+        s.storage.change({ paused: true });
+        // La fenêtre est partie : ce qui était mesuré appartient déjà au moteur, et rien ne
+        // s'accumule derrière un capteur suspendu.
+        assert.equal(s.counters.keystrokes, 0);
+        s.type(5);
+        assert.equal(s.counters.keystrokes, 0);
+    });
+
+    await t.test('recompte dès la reprise', async () => {
+        const s = sensor({ stored: { paused: true } });
+        await s.settled();
+        s.type(2);
+        s.storage.change({ paused: false });
+        s.type(4);
+        assert.equal(s.counters.keystrokes, 4);
     });
 });

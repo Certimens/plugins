@@ -13,14 +13,19 @@
   </dependencies>
   <publisher>
     <name xlink:href="https://certimens.fr" lang="fr">Certimens</name>
+    <name xlink:href="https://certimens.fr" lang="en">Certimens</name>
   </publisher>
+  <!-- LibreOffice shows the entry matching its own interface language and falls back to the
+       first one otherwise. The windows follow the Certimens account instead (see i18n.py). -->
   <display-name>
     <name lang="fr">Certimens — Agent de rédaction</name>
+    <name lang="en">Certimens — Writing Agent</name>
   </display-name>
   <icon>
     <default xlink:href="icons/icon128.png"/>
   </icon>
   <extension-description>
     <src xlink:href="description/description-fr.txt" lang="fr"/>
+    <src xlink:href="description/description-en.txt" lang="en"/>
   </extension-description>
 </description>

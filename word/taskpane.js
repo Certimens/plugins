@@ -5,7 +5,7 @@
 let current = { docId: null, fileId: null, assignmentId: null };
 
 function formatDeadline(iso) {
-    return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+    return new Date(iso).toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short' });
 }
 
 // Error response in the format expected by errorText (ui.js).
@@ -24,10 +24,10 @@ async function loadAssignments() {
     }
     assignments.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
     select.replaceChildren(
-        Object.assign(document.createElement('option'), { value: '', textContent: current.fileId ? '— Choisir un devoir —' : '— Aucun devoir pour l\'instant —' }),
+        Object.assign(document.createElement('option'), { value: '', textContent: t(current.fileId ? 'assignment.choose' : 'assignment.none') }),
         ...assignments.map((a) => Object.assign(document.createElement('option'), {
             value: a.id,
-            textContent: `${a.title} (${new Date(a.deadline) < new Date() ? 'échu le' : 'avant le'} ${formatDeadline(a.deadline)})`,
+            textContent: t(new Date(a.deadline) < new Date() ? 'assignment.overdue' : 'assignment.due', { title: a.title, date: formatDeadline(a.deadline) }),
         })),
     );
     select.value = current.assignmentId || '';
@@ -43,8 +43,10 @@ function showLinked(file) {
     $('linkedName').textContent = file.document_name;
     $('open').href = `${trimUrl(getConfig().engineUrl)}/file/${file.id}`;
     $('submitted').hidden = !file.assignment_id;
-    $('submitted').textContent = file.assignment_title ? `Rendu sur : ${file.assignment_title}` : 'Rendu sur un devoir';
-    $('uploadHint').textContent = file.content_type ? 'Un document est déjà envoyé : un nouvel envoi le remplace.' : '';
+    $('submitted').textContent = file.assignment_title
+        ? t('doc.submittedTo', { title: file.assignment_title })
+        : t('doc.submittedGeneric');
+    $('uploadHint').textContent = file.content_type ? t('doc.alreadyUploaded') : '';
     updateSubmitButton();
     loadWithDocument();
 }
@@ -62,31 +64,43 @@ function loadWithDocument() {
 function updateSubmitButton() {
     const chosen = $('assignment').value;
     $('submit').hidden = !current.fileId || $('assignmentBox').hidden || !chosen || chosen === current.assignmentId;
-    $('submit').textContent = current.assignmentId ? 'Changer de devoir' : 'Rendre sur ce devoir';
+    $('submit').textContent = t(current.assignmentId ? 'doc.changeAssignment' : 'doc.submit');
 }
 
 function renderSync() {
     const { queue, status } = getState();
+    // The suspension comes first: it changes what every other line means. The pause is shared by
+    // every document open in this Word, hence the wording.
+    const paused = isPaused();
+    $('pausedAlert').hidden = !paused;
+    $('pause').textContent = t(paused ? 'pause.resume' : 'pause.suspend');
+    if (paused) {
+        $('sync').textContent = queue.length ? t('pause.queued', { count: queue.length }) : '';
+        return;
+    }
     const labels = {
-        synced: 'Mesures à jour.',
-        offline: `Moteur injoignable : ${queue.length} mesure(s) en attente, renvoi automatique.`,
-        auth_error: 'Identifiants refusés par le moteur.',
-        unconfigured: 'Non connecté : les mesures sont gardées jusqu\'à la connexion.',
+        synced: t('sync.synced'),
+        offline: t('sync.offline', { count: queue.length }),
+        auth_error: t('sync.auth_error'),
+        unconfigured: t('sync.unconfigured'),
     };
-    $('sync').textContent = labels[status.state] || (queue.length ? `${queue.length} mesure(s) en attente.` : '');
+    $('sync').textContent = labels[status.state] || (queue.length ? t('sync.queued', { count: queue.length }) : '');
 }
 
 async function submitTo(fileId, assignmentId) {
     try {
         return await submitFile(fileId, assignmentId);
     } catch (err) {
-        showMessage(err.status === 403 ? `Rendu impossible : ${err.message}.` : errorText(failure(err)), false);
+        showMessage(err.status === 403 ? t('submit.refused', { message: err.message }) : errorText(failure(err)), false);
         return null;
     }
 }
 
 async function render() {
     const config = getConfig();
+    // The account's language, as soon as it is known; Word's display language until then.
+    document.documentElement.lang = setLanguage(config.language, Office.context.displayLanguage);
+    applyTranslations();
     const loggedIn = !!(config.token || config.password) && getState().status.state !== 'auth_error';
     $('login').hidden = loggedIn;
     $('account').hidden = !loggedIn;
@@ -95,7 +109,7 @@ async function render() {
     if (!loggedIn) {
         $('engineUrl').value = config.engineUrl;
         $('email').value = config.email || '';
-        if (getState().status.state === 'auth_error') showMessage('Identifiants refusés : reconnectez-vous.', false);
+        if (getState().status.state === 'auth_error') showMessage(t('error.authRefused'), false);
         return;
     }
 
@@ -161,7 +175,7 @@ $('create').addEventListener('submit', async (e) => {
         render(); // file created but not submitted: the error message stays on screen
         return;
     }
-    showMessage(res.existed ? 'Ce document avait déjà un fichier.' : (file ? 'Fichier créé et rendu.' : 'Fichier créé.'), true);
+    showMessage(t(res.existed ? 'create.existed' : (file ? 'create.createdAndSubmitted' : 'create.created')), true);
     render();
 });
 
@@ -173,20 +187,22 @@ $('submit').addEventListener('click', async () => {
     const file = await submitTo(current.fileId, $('assignment').value);
     button.disabled = false;
     if (!file) return;
-    showMessage('Fichier rendu.', true);
+    showMessage(t('submit.done'), true);
     render();
 });
 
 $('uploadDocx').addEventListener('click', async () => {
     const button = $('uploadDocx');
     button.disabled = true;
-    showMessage('Envoi du document…', true);
+    showMessage(t('upload.sending'), true);
     try {
         const file = await uploadDocx(current.docId);
-        showMessage('Document envoyé.', true);
+        showMessage(t('upload.done'), true);
         showLinked(file);
     } catch (err) {
-        showMessage(err.status === 0 || err.status === 413 || err.status === 404 ? `Envoi impossible : ${err.message}.` : errorText(failure(err)), false);
+        showMessage(err.status === 0 || err.status === 413 || err.status === 404
+            ? t('upload.failed', { message: err.message })
+            : errorText(failure(err)), false);
     }
     button.disabled = false;
 });
@@ -197,10 +213,20 @@ $('logout').addEventListener('click', async () => {
     render();
 });
 
+$('pause').addEventListener('click', () => {
+    const paused = !isPaused();
+    // The window in progress is closed before the pause: nothing measured is lost, and nothing
+    // keeps accumulating behind a suspended sensor.
+    if (paused) flush('pause');
+    setPaused(paused);
+    showMessage(t(paused ? 'pause.paused' : 'pause.resumed'), !paused);
+});
+
 Office.onReady(async (info) => {
     if (info.host !== Office.HostType.Word) return;
     current.docId = documentId();
     $('webNote').hidden = !isWordOnline();
+    $('pause').hidden = false;
     onStatusChange(renderSync);
     startAgent();
     render();
@@ -208,6 +234,6 @@ Office.onReady(async (info) => {
         await startSensor();
     } catch (err) {
         console.warn('Certimens : mesure indisponible.', err);
-        showMessage('Mesure indisponible dans cette version de Word.', false);
+        showMessage(t('word.measureUnavailable'), false);
     }
 });
