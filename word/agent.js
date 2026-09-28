@@ -49,16 +49,15 @@ function save(key, value) {
 }
 
 function getConfig() {
-    // token: API token (Bearer) kept in place of the password. tokenId: its identifier,
-    // used to revoke it on logout. password: legacy setting, migrated on the next send.
+    // token: API token (Bearer) kept in place of the password — the password itself is never
+    // stored. tokenId: its identifier, used to revoke the token on logout.
     // language: the account's own, sent by the engine at login, so the task pane opens in the
     // language the student chose in their Certimens space.
     return { engineUrl: DEFAULT_ENGINE_URL, email: '', token: '', tokenId: '', language: '', ...load('config', {}) };
 }
 
-// A config can authenticate if it carries a token, or a legacy password still to be migrated.
 function hasAuth(config) {
-    return !!(config.token || config.password);
+    return !!config.token;
 }
 
 function getState() {
@@ -256,35 +255,6 @@ async function createApiToken(engineUrl, email, password) {
     return { me, token: token.token, tokenId: token.id };
 }
 
-// A config guaranteed to carry a token. A legacy password-based config is migrated once here:
-// its password is exchanged for a token, then erased from local storage.
-//
-// Two guards against creating more than one API token, which would leave one valid on the
-// engine with no way for the student to revoke it: the in-flight migration is shared inside
-// this instance, and because every open document runs its own instance over the same
-// localStorage, a token that lost the race is revoked instead of being dropped.
-let migration = null;
-async function authedConfig() {
-    const config = getConfig();
-    if (config.token || !config.password) return config;
-    if (!migration) {
-        migration = (async () => {
-            const { me, token, tokenId } = await createApiToken(config.engineUrl, config.email, config.password);
-            const fresh = getConfig();
-            if (fresh.token) {
-                // another instance migrated first: revoke the token we just created
-                try {
-                    await api({ ...fresh, token, tokenId }, 'DELETE', `/api/auth/tokens/${tokenId}`);
-                } catch (_) { /* offline: the duplicate stays revocable from the Certimens space */ }
-                return fresh;
-            }
-            const migrated = { engineUrl: trimUrl(config.engineUrl), email: me.email || config.email, token, tokenId, language: me.language || '' };
-            save('config', migrated);
-            return migrated;
-        })().finally(() => { migration = null; });
-    }
-    return migration;
-}
 
 // Creates the document's engine file if needed. editorTitle is the document's name in Word at
 // that moment: it serves as the reference for detecting a later rename, even if the file was
@@ -345,7 +315,7 @@ function createFileFor(docId, name, editorTitle) {
     return withLock(async () => {
         const { files } = getState();
         const existed = !!files[docId];
-        const fileId = await ensureFile(await authedConfig(), files, { documentId: docId, documentName: name }, editorTitle || name);
+        const fileId = await ensureFile(getConfig(), files, { documentId: docId, documentName: name }, editorTitle || name);
         return { fileId, existed };
     });
 }
@@ -355,7 +325,7 @@ async function docInfo(docId) {
     const fileId = getState().files[docId];
     if (!fileId) return { fileId: null, file: null };
     try {
-        return { fileId, file: await api(await authedConfig(), 'GET', `/api/files/${fileId}`) };
+        return { fileId, file: await api(getConfig(), 'GET', `/api/files/${fileId}`) };
     } catch (err) {
         if (err.status !== 404) throw err;
         saveEntry('files', docId, undefined);
@@ -366,7 +336,7 @@ async function docInfo(docId) {
 // Assignments the student is enrolled in. Submitting a file to an assignment is reserved for
 // students: for any other role (teacher, administrator, free account), no assignments.
 async function listAssignments() {
-    const config = await authedConfig();
+    const config = getConfig();
     const me = await api(config, 'GET', '/api/auth/me');
     if (me.role !== 'student') return [];
     return api(config, 'GET', '/api/assignments');
@@ -378,12 +348,12 @@ async function uploadDocx(docId) {
     if (!fileId) throw new HttpError(404, "créez d'abord le fichier Certimens");
     const document = await readDocx();
     if (document.length > MAX_UPLOAD_BASE64) throw new HttpError(413, 'document trop volumineux (18 Mo maximum)');
-    return api(await authedConfig(), 'PUT', `/api/files/${fileId}`, { document });
+    return api(getConfig(), 'PUT', `/api/files/${fileId}`, { document });
 }
 
 // The engine silently ignores an assignment the student is not enrolled in: we detect it.
 async function submitFile(fileId, assignmentId) {
-    const file = await api(await authedConfig(), 'PUT', `/api/files/${fileId}`, { assignment_id: assignmentId });
+    const file = await api(getConfig(), 'PUT', `/api/files/${fileId}`, { assignment_id: assignmentId });
     if (file.assignment_id !== assignmentId) throw new HttpError(403, "vous n'êtes pas rattaché à ce devoir");
     return file;
 }
@@ -444,7 +414,7 @@ function drain() {
         }
         let config;
         try {
-            config = await authedConfig();
+            config = getConfig();
         } catch (err) {
             setStatus(failureStatus(err));
             return;

@@ -109,6 +109,34 @@ label.btn.disabled { opacity: 0.5; pointer-events: none; }
 .btn.outlined { color: var(--primary); background: transparent; box-shadow: inset 0 0 0 1px rgba(30, 41, 59, 0.5); }
 .btn.outlined:hover { background: var(--primary-soft); box-shadow: inset 0 0 0 1px var(--primary); }
 
+/* Icon-only actions, in the header: they buy back the width a popup does not have. An icon alone
+   names nothing, so each one carries an aria-label (what it does) and a title (what happens if
+   you press it) — and the state they toggle is never theirs alone to tell: the suspended
+   measurement keeps its banner in plain words. 32px is the smallest comfortable target here. */
+.icon-actions { display: flex; gap: 2px; margin-left: auto; }
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    color: var(--text-secondary);
+    background: transparent;
+    cursor: pointer;
+}
+.icon-btn:hover { color: var(--text); background: var(--primary-soft); }
+/* Keyboard focus stays visible: these are the only controls of the header. */
+.icon-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+/* Pressed = measurement suspended. The colour seconds the banner, it never replaces it. */
+.icon-btn[aria-pressed='true'] { color: var(--error); background: rgba(197, 34, 31, 0.1); }
+.icon-btn svg { width: 18px; height: 18px; display: block; }
+/* `hidden` is an HTML attribute: the user-agent rule that acts on it does not reach into SVG,
+   so the swap between the pause and the play icon is spelled out here. */
+.icon-btn svg[hidden] { display: none; }
+
 /* Links read as brass rather than slate, and underline on hover only — the engine's MuiLink. */
 .link {
     padding: 0;

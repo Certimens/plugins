@@ -16,6 +16,8 @@ const i18nGlobals = {
 const uiGlobals = {
     $: 'readonly',
     startLanguage: 'readonly',
+    renderIconActions: 'readonly',
+    showIcon: 'readonly',
     DEFAULT_ENGINE_URL: 'readonly',
     showMessage: 'readonly',
     clearMessage: 'readonly',

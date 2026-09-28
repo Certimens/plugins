@@ -190,23 +190,6 @@ class EngineTest(unittest.TestCase):
         self.engine.login(self.url, 'a@b.fr', 'secret')
         self.assertEqual(os.stat(self.engine.path).st_mode & 0o777, 0o600)
 
-    def test_legacy_password_is_migrated_once(self):
-        # Legacy password-based setting (before tokens): migrated on the first authenticated call.
-        self.engine.state['config'] = {'engineUrl': self.url, 'email': 'a@b.fr', 'password': 'secret'}
-        cfg = self.engine.authed_config()
-        self.assertTrue(cfg['token'])
-        self.assertNotIn('password', cfg)
-        # persisted: a fresh startup keeps the token, no longer the password
-        restarted = Engine(self.engine.path)
-        self.assertTrue(restarted.config().get('token'))
-        self.assertNotIn('password', restarted.state['config'])
-        creates = [c for c in FakeEngine.calls if c[:2] == ('POST', '/api/auth/tokens')]
-        self.assertEqual(len(creates), 1)
-        # a second call no longer exchanges anything
-        FakeEngine.calls = []
-        self.engine.authed_config()
-        self.assertEqual([c for c in FakeEngine.calls if c[1] == '/api/auth/tokens'], [])
-
     def test_logout_revokes_the_token(self):
         self.engine.login(self.url, 'a@b.fr', 'secret')
         token_id = self.engine.config()['tokenId']
@@ -227,34 +210,6 @@ class EngineTest(unittest.TestCase):
         self.assertIn('/api/auth/login', paths)
         self.assertIn('/api/auth/tokens', paths)
         self.assertIn('/api/auth/logout', paths)
-
-    def test_concurrent_migration_creates_one_token(self):
-        """Two threads reaching authed_config() at once must not create two API tokens: the
-        extra one would stay valid on the engine with nothing recording it."""
-        import threading as th
-        self.engine.state['config'] = {'engineUrl': self.url, 'email': 'a@b.fr', 'password': 'secret'}
-        results, barrier = [], th.Barrier(2)
-        def go():
-            barrier.wait()
-            results.append(self.engine.authed_config())
-        threads = [th.Thread(target=go) for _ in range(2)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-        creates = [c for c in FakeEngine.calls if c[:2] == ('POST', '/api/auth/tokens')]
-        self.assertEqual(len(creates), 1)
-        self.assertEqual(results[0]['token'], results[1]['token'])
-
-    def test_failed_migration_sets_offline_status(self):
-        """A migration that cannot reach the engine must report it, not escape drain() and
-        leave the status showing the previous state while the queue grows."""
-        self.engine.state['config'] = {'engineUrl': self.url, 'email': 'a@b.fr', 'password': 'secret'}
-        self.engine.enqueue('doc1', 'Mémoire', (1000, 1002), {'total_keystrokes': 1})
-        FakeEngine.down = True
-        self.engine.drain()  # must not raise
-        self.assertEqual(self.engine.status()[0]['state'], 'offline')
-        self.assertEqual(self.engine.status()[1], 1)  # the measurement is kept
 
     def test_state_file_never_world_readable(self):
         """The file carries the API token: it must be 0600 from its very first write."""

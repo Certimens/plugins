@@ -31,6 +31,7 @@ const MESSAGES = {
         'login.submit': 'Se connecter',
         'account.connected': 'Connecté :',
         'account.logout': 'Se déconnecter',
+        'account.logoutTip': 'Se déconnecter — le jeton d’accès est révoqué sur le moteur ; la mesure s’arrête jusqu’à la prochaine connexion.',
         'logout.done': 'Certimens : déconnecté, le jeton a été révoqué.',
 
         'error.credentials': 'Identifiants incorrects ou accès révoqué — reconnectez-vous.',
@@ -74,6 +75,8 @@ const MESSAGES = {
         'panel.pausedAlert': 'Mesure suspendue : rien n’est mesuré tant que vous ne la reprenez pas.',
 
         'pause.suspend': 'Suspendre la mesure',
+        'pause.suspendTip': 'Suspendre la mesure — plus rien n’est compté jusqu’à ce que vous la repreniez, même après un redémarrage.',
+        'pause.resumeTip': 'Reprendre la mesure — les fenêtres de mesure repartent aussitôt.',
         'pause.resume': 'Reprendre la mesure',
         'notify.paused': 'Certimens : mesure suspendue. Rien n’est mesuré tant que vous ne la reprenez pas.',
         'notify.resumed': 'Certimens : mesure reprise.',
@@ -100,6 +103,7 @@ const MESSAGES = {
         'login.submit': 'Log in',
         'account.connected': 'Logged in:',
         'account.logout': 'Log out',
+        'account.logoutTip': 'Log out — the access token is revoked on the engine; measurement stops until you log in again.',
         'logout.done': 'Certimens: logged out, the token has been revoked.',
 
         'error.credentials': 'Wrong credentials, or access revoked — log in again.',
@@ -140,6 +144,8 @@ const MESSAGES = {
         'panel.pausedAlert': 'Measurement paused: nothing is measured until you resume it.',
 
         'pause.suspend': 'Pause measurement',
+        'pause.suspendTip': 'Pause measurement — nothing is counted until you resume it, even after a restart.',
+        'pause.resumeTip': 'Resume measurement — measurement windows start again straight away.',
         'pause.resume': 'Resume measurement',
         'notify.paused': 'Certimens: measurement paused. Nothing is measured until you resume it.',
         'notify.resumed': 'Certimens: measurement resumed.',

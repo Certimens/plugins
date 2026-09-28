@@ -54,8 +54,6 @@ class Engine:
         # The Certimens window and the sending thread can both create the file for the same
         # document: one at a time, otherwise the engine would end up with two.
         self.create_lock = threading.Lock()
-        # Serializes the one-time legacy-password migration (see authed_config).
-        self.migrate_lock = threading.Lock()
         self.wake = threading.Event()
         self.listeners = []
         self.state = self._load()
@@ -81,9 +79,8 @@ class Engine:
         os.replace(tmp, self.path)
 
     def config(self):
-        # token: API token (Bearer) kept in place of the password. tokenId: its
-        # identifier, used to revoke it at logout. password: legacy setting, migrated on the
-        # next send (see authed_config).
+        # token: API token (Bearer) kept in place of the password — the password itself is
+        # never stored. tokenId: its identifier, used to revoke the token at logout.
         with self.lock:
             # language: the account's own, sent by the engine at login, so every window opens in
             # the language the student chose in their Certimens space.
@@ -92,8 +89,7 @@ class Engine:
 
     @staticmethod
     def _has_auth(config):
-        """True if the setting carries a token, or a legacy password still to be migrated."""
-        return bool(config.get('token') or config.get('password'))
+        return bool(config.get('token'))
 
     def status(self):
         with self.lock:
@@ -157,7 +153,7 @@ class Engine:
             raise HttpError(0, str(getattr(err, 'reason', err)))
 
     def api(self, method, path, body=None, config=None):
-        config = config or self.authed_config()
+        config = config or self.config()
         return self._request(method, trim_url(config['engineUrl']) + path, body, config['token'])
 
     def _create_api_token(self, engine_url, email, password):
@@ -173,33 +169,6 @@ class Engine:
         except HttpError:
             pass  # network: the session token will expire on its own
         return me, token['token'], token['id']
-
-    def authed_config(self):
-        """Setting guaranteed to carry a token. A legacy password-based setting is migrated once
-        here: its password is exchanged for a token, then erased.
-
-        The migration runs under its own lock and re-checks the setting inside it: two callers
-        racing here (the sending thread and the Certimens window) would otherwise each create an
-        API token, and only the last one would be recorded — the other would stay valid on the
-        engine with no way to revoke it.
-        """
-        config = self.config()
-        if config.get('token') or not config.get('password'):
-            return config
-        with self.migrate_lock:
-            config = self.config()
-            if config.get('token') or not config.get('password'):
-                return config
-            return self._migrate(config)
-
-    def _migrate(self, config):
-        me, token, token_id = self._create_api_token(config['engineUrl'], config['email'], config['password'])
-        migrated = {'engineUrl': trim_url(config['engineUrl']), 'email': me.get('email') or config['email'],
-                    'token': token, 'tokenId': token_id, 'language': me.get('language') or ''}
-        with self.lock:
-            self.state['config'] = migrated
-            self._save()
-        return migrated
 
     def login(self, engine_url, email, password):
         """The password is exchanged for an API token, the only thing kept (the engine only
@@ -246,7 +215,7 @@ class Engine:
     def create_file(self, document_id, name, editor_title):
         """Explicit creation (Certimens window); no effect if the file already exists."""
         existed = bool(self.file_id(document_id))
-        return self._ensure_file(self.authed_config(), document_id, name, editor_title), existed
+        return self._ensure_file(self.config(), document_id, name, editor_title), existed
 
     def doc_info(self, document_id):
         """Engine file linked to a document (None if not yet created or deleted)."""
@@ -353,7 +322,7 @@ class Engine:
             self._set_status({'state': 'unconfigured'})
             return
         try:
-            config = self.authed_config()
+            config = self.config()
             while True:
                 with self.lock:
                     if not self.state['queue']:

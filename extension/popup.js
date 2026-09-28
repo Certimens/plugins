@@ -92,6 +92,8 @@ async function render() {
     $('account').hidden = !loggedIn;
 
     if (!loggedIn) {
+        // Nothing to suspend and nothing to log out of before the student is connected.
+        $('actions').hidden = true;
         $('engineUrl').value = current.engineUrl;
         $('email').value = s.email || '';
         if (s.status.state === 'auth_error') showMessage(t('error.authRefused'), false);
@@ -102,7 +104,7 @@ async function render() {
     // The suspension is global: it is shown whether or not a document is open in this tab.
     current.paused = s.paused;
     $('pausedAlert').hidden = !s.paused;
-    $('pause').textContent = t(s.paused ? 'pause.resume' : 'pause.suspend');
+    renderIconActions(s.paused);
 
     current.doc = await activeDocument();
     $('doc').hidden = !current.doc;

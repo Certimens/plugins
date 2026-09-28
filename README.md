@@ -14,8 +14,7 @@ Extension navigateur (Manifest V3 : Chrome, Edge, Opera, Brave, Vivaldi, Arc, Fi
 pour Android, Safari macOS et iOS) qui mesure la rédaction **directement
 dans Google Docs et Word Online**, sans agent de bureau Python, et pousse les mesures au moteur via
 `POST /api/files/:id/metrics`, authentifiées par un jeton d'API (Bearer) créé à la connexion et
-conservé à la place du mot de passe (l'ancien mot de passe stocké est migré une fois au prochain
-envoi, puis effacé).
+conservé à la place du mot de passe — qui, lui, n'est jamais stocké.
 
 Aucun texte ni aucune touche n'est enregistré : seulement des compteurs par fenêtre de mesure.
 
@@ -353,6 +352,13 @@ Le comportement est le même partout :
   état qu'un agent de mesure ne doit jamais produire, c'est « suspendu mais qui en a l'air actif ».
 
 La suspension est **globale à l'agent**, pas par document : c'est l'étudiant qui suspend.
+
+La suspension et la déconnexion sont deux **icônes en haut à droite** de la popup, du volet Word
+et du panneau VS Code — une popup n'a pas la largeur pour deux boutons pleins. Chacune porte son
+action en `aria-label` et, au survol, la phrase qui dit ce qu'elle déclenche ; la suspension
+ajoute `aria-pressed` et vire au rouge, sans jamais être le seul indice de l'état. La fenêtre
+LibreOffice garde ses boutons texte — un dialogue UNO n'a pas d'icônes — avec la même aide au
+survol (`HelpText`).
 
 L'état s'affiche **une fois** : le bandeau permanent le porte, et le message transitoire ne
 confirme que la reprise — elle, ne laisse rien à l'écran. Dans le panneau VS Code, la ligne d'état

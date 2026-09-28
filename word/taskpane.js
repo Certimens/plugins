@@ -73,7 +73,9 @@ function renderSync() {
     // every document open in this Word, hence the wording.
     const paused = isPaused();
     $('pausedAlert').hidden = !paused;
-    $('pause').textContent = t(paused ? 'pause.resume' : 'pause.suspend');
+    // renderSync also runs on a status change while logged out (a send that failed before the
+    // session ended): the header's actions must not reappear then.
+    if (!$('account').hidden) renderIconActions(paused);
     if (paused) {
         $('sync').textContent = queue.length ? t('pause.queued', { count: queue.length }) : '';
         return;
@@ -107,6 +109,8 @@ async function render() {
     renderSync();
 
     if (!loggedIn) {
+        // Nothing to suspend and nothing to log out of before the student is connected.
+        $('actions').hidden = true;
         $('engineUrl').value = config.engineUrl;
         $('email').value = config.email || '';
         if (getState().status.state === 'auth_error') showMessage(t('error.authRefused'), false);
@@ -229,7 +233,6 @@ Office.onReady(async (info) => {
     if (info.host !== Office.HostType.Word) return;
     current.docId = documentId();
     $('webNote').hidden = !isWordOnline();
-    $('pause').hidden = false;
     onStatusChange(renderSync);
     startAgent();
     render();

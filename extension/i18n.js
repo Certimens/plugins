@@ -30,6 +30,7 @@ const MESSAGES = {
         'login.reconnectToChange': 'Connecté : {email}. Reconnectez-vous pour changer de compte.',
         'account.connected': 'Connecté :',
         'account.logout': 'Se déconnecter',
+        'account.logoutTip': 'Se déconnecter — le jeton d’accès est révoqué sur le moteur ; la mesure s’arrête jusqu’à la prochaine connexion.',
 
         'error.credentials': 'Identifiants incorrects ou accès révoqué — reconnectez-vous.',
         'error.engineUnreachable': 'Moteur injoignable ({message}).',
@@ -73,6 +74,8 @@ const MESSAGES = {
         'upload.exportDenied': "Autorisation refusée : l'extension ne peut pas lire l'export Google Docs.",
 
         'pause.suspend': 'Suspendre la mesure',
+        'pause.suspendTip': 'Suspendre la mesure — plus rien n’est compté jusqu’à ce que vous la repreniez, même après un redémarrage.',
+        'pause.resumeTip': 'Reprendre la mesure — les fenêtres de mesure repartent aussitôt.',
         'pause.resume': 'Reprendre la mesure',
         'pause.alert': "Mesure suspendue : rien n'est mesuré tant que vous ne la reprenez pas.",
         'pause.paused': 'Mesure suspendue. Elle le reste jusqu’à ce que vous la repreniez, même après un redémarrage.',
@@ -144,6 +147,7 @@ const MESSAGES = {
         'login.reconnectToChange': 'Logged in: {email}. Log in again to switch account.',
         'account.connected': 'Logged in:',
         'account.logout': 'Log out',
+        'account.logoutTip': 'Log out — the access token is revoked on the engine; measurement stops until you log in again.',
 
         'error.credentials': 'Wrong credentials, or access revoked — log in again.',
         'error.engineUnreachable': 'Engine unreachable ({message}).',
@@ -187,6 +191,8 @@ const MESSAGES = {
         'upload.exportDenied': 'Permission refused: the extension cannot read the Google Docs export.',
 
         'pause.suspend': 'Pause measurement',
+        'pause.suspendTip': 'Pause measurement — nothing is counted until you resume it, even after a restart.',
+        'pause.resumeTip': 'Resume measurement — measurement windows start again straight away.',
         'pause.resume': 'Resume measurement',
         'pause.alert': 'Measurement paused: nothing is measured until you resume it.',
         'pause.paused': 'Measurement paused. It stays paused until you resume it, even after a restart.',

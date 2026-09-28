@@ -57,9 +57,8 @@ La version vient de git. Release (tag `vX.Y.Z`) → `X.Y.Z` ; sinon dernier tag 
 - Tout accès à la file passe par `withLock` : un envoi et une nouvelle mesure ne doivent ni se
   marcher dessus ni créer deux fichiers pour le même document.
 - L'authentification est un **token d'API (Bearer)** créé à la connexion et gardé à la place du
-  mot de passe. La migration d'une ancienne config partage sa promesse en vol (`migration`) :
-  sans ça, deux appels concurrents créent deux tokens, dont un restera valide sans moyen de le
-  révoquer.
+  mot de passe, qui n'est jamais stocké. La connexion est le seul chemin qui écrit une
+  configuration, et elle écrit toujours un token.
 - Pas de DOM dans le service worker (ni `document`, ni `localStorage`).
 
 `content.js` tourne dans Google Docs et dans l'iframe d'édition de Word Online

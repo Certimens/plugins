@@ -161,8 +161,13 @@ class Window(unohelper.Base, XActionListener):
         self.text(name + 'Label', label, height=9)
         return self._add('ListBox', name, 13, Dropdown=True)
 
-    def button(self, name, label, action, default=False, blocking=True):
+    def button(self, name, label, action, default=False, blocking=True, help=''):
+        """A button. `help` is what LibreOffice shows on hover (HelpText), where the other
+        agents put a tooltip on their icon: a UNO dialog has no icon buttons, but it has the
+        same room for saying what pressing this does."""
         model = self._add('Button', name, 14, Label=label)
+        if help:
+            model.setPropertyValue('HelpText', help)
         if default:
             model.setPropertyValue('DefaultButton', True)
         self.actions[name] = action
@@ -324,8 +329,8 @@ class DocumentWindow(Window):
         else:
             self._create_controls()
         self.line()
-        self.button('pause', self._pause_label(), self.toggle_pause)
-        self.button('logout', t('account.logout'), self.logout)
+        self.button('pause', self._pause_label(), self.toggle_pause, help=self._pause_help())
+        self.button('logout', t('account.logout'), self.logout, help=t('account.logoutTip'))
         self.button('close', t('common.close'), self.close, default=True, blocking=False)
 
     def _create_controls(self):
@@ -366,6 +371,9 @@ class DocumentWindow(Window):
     def _pause_label(self):
         return t('pause.resume' if self.engine.paused() else 'pause.suspend')
 
+    def _pause_help(self):
+        return t('pause.resumeTip' if self.engine.paused() else 'pause.suspendTip')
+
     def toggle_pause(self):
         paused = not self.engine.paused()
         # The window in progress is closed before the pause: nothing measured is lost, and
@@ -374,6 +382,7 @@ class DocumentWindow(Window):
             self.sensor.flush('pause')
         self.engine.set_paused(paused)
         self.label('pause', self._pause_label())
+        self.model.getByName('pause').setPropertyValue('HelpText', self._pause_help())
         self.message(t('pause.paused' if paused else 'pause.resumed'))
 
     # --- loading ---
