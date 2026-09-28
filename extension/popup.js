@@ -237,7 +237,11 @@ $('logout').addEventListener('click', async () => {
 $('pause').addEventListener('click', async () => {
     const res = await chrome.runtime.sendMessage({ type: 'CERTIMENS_SET_PAUSED', paused: !current.paused });
     if (!res.ok) return showMessage(errorText(res), false);
-    showMessage(t(res.paused ? 'pause.paused' : 'pause.resumed'), !res.paused);
+    // Suspendre affiche déjà un bandeau permanent : le confirmer en plus mettait deux messages
+    // rouges l'un sous l'autre, disant la même chose en deux formulations. La reprise, elle,
+    // ne laisse rien à l'écran — c'est le seul cas où une confirmation apprend quelque chose.
+    if (res.paused) clearMessage();
+    else showMessage(t('pause.resumed'), true);
     render();
 });
 

@@ -71,6 +71,12 @@ Les quatre agents ont un bouton qui **suspend la mesure**. Quatre règles, ident
 
 L'état est **global à l'agent**, pas par document : c'est l'étudiant qui suspend, pas un fichier.
 
+**Il s'affiche une fois, pas deux.** Le bandeau permanent porte l'état ; le message transitoire ne
+confirme que la **reprise**, qui ne laisse rien à l'écran. Les deux ensemble donnaient deux blocs
+rouges l'un sous l'autre, disant la même chose en deux formulations — c'était
+[Certimens/plugins#2](https://github.com/Certimens/plugins/issues/2). La fenêtre LibreOffice fait
+exception : faute de bandeau permanent, son message *est* l'affichage de l'état.
+
 | Implémentation | Où l'état est gardé | Où les événements sont filtrés |
 | --- | --- | --- |
 | Extension navigateur | `chrome.storage.local`, clé `paused` | `extension/content.js` (chaque gestionnaire, et `recordInjection`) |

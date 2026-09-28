@@ -219,7 +219,10 @@ $('pause').addEventListener('click', () => {
     // keeps accumulating behind a suspended sensor.
     if (paused) flush('pause');
     setPaused(paused);
-    showMessage(t(paused ? 'pause.paused' : 'pause.resumed'), !paused);
+    // Le bandeau permanent dit déjà la suspension (renderSync) : la confirmer en plus mettait
+    // deux messages l'un sous l'autre. Seule la reprise mérite un message, elle n'en laisse aucun.
+    if (paused) clearMessage();
+    else showMessage(t('pause.resumed'), true);
 });
 
 Office.onReady(async (info) => {

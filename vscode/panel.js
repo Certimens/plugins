@@ -45,9 +45,12 @@ function statusText(status, queued, paused) {
     // The queue keeps draining while paused — what was measured before belongs to the engine
     // already, and holding it back would only turn a pause into a late, suspicious batch.
     if (paused) {
+        // Le bandeau du panneau dit déjà la suspension : cette ligne n'ajoute quelque chose que
+        // s'il reste des mesures d'avant la pause à envoyer. Sinon elle se tait, plutôt que de
+        // répéter le bandeau juste au-dessus.
         return queued > 0
             ? { text: plural('panel.pausedQueued', queued), kind: 'error' }
-            : { text: t('panel.paused'), kind: 'error' };
+            : { text: '', kind: '' };
     }
     if (status.state === 'unconfigured') return { text: t('panel.notConnected'), kind: 'info' };
     if (status.state === 'auth_error') return { text: t('panel.authRefused'), kind: 'error' };

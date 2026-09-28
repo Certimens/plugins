@@ -354,6 +354,10 @@ Le comportement est le même partout :
 
 La suspension est **globale à l'agent**, pas par document : c'est l'étudiant qui suspend.
 
+L'état s'affiche **une fois** : le bandeau permanent le porte, et le message transitoire ne
+confirme que la reprise — elle, ne laisse rien à l'écran. Dans le panneau VS Code, la ligne d'état
+ne parle pendant une pause que s'il reste des mesures d'avant à envoyer.
+
 Côté moteur, rien n'est déclaré : le trou reste lisible dans le nombre de fenêtres et dans
 l'`unmeasured_ratio` du fichier — la part du document qu'aucune mesure n'explique. Un devoir écrit
 pour moitié pendant une pause le montre là.
