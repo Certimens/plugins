@@ -6,6 +6,11 @@
 // password. When offline, they stay in a persisted queue (chrome.storage.local) and are
 // resent every minute.
 
+// The shared dictionary. Chrome runs this as a service worker and imports it here; Firefox runs
+// it as an event page and loads it from the manifest's background.scripts, where importScripts
+// does not exist.
+if (typeof importScripts === 'function') importScripts('i18n.js');
+
 const DEFAULT_ENGINE_URL = 'https://monespace.certimens.fr';
 const RETRY_ALARM = 'certimens-retry';
 const MAX_QUEUE = 5000;
@@ -34,7 +39,9 @@ async function getConfig() {
     // token: API token (Bearer) kept in place of the password. tokenId: its id,
     // used to revoke it at logout. password: present only in an old config, migrated
     // on the next send (see authedConfig).
-    return { engineUrl: DEFAULT_ENGINE_URL, email: '', token: '', tokenId: '', ...config };
+    // language: the account's own, sent by the engine at login, so the popup and the options page
+    // open in the language the student chose in their Certimens space.
+    return { engineUrl: DEFAULT_ENGINE_URL, email: '', token: '', tokenId: '', language: '', ...config };
 }
 
 // A config can authenticate if it carries a token, or an old password still to be migrated.
@@ -43,8 +50,12 @@ function hasAuth(config) {
 }
 
 async function getState() {
-    const s = await chrome.storage.local.get(['files', 'titles', 'syncedTitles', 'queue', 'status', 'extendedUnsupported']);
+    const s = await chrome.storage.local.get(['files', 'titles', 'syncedTitles', 'queue', 'status', 'extendedUnsupported', 'paused']);
     return {
+        // Suspended measurement: the content scripts read this key themselves (see content.js).
+        // Nothing is gated here — the queue keeps draining while paused, because what was already
+        // measured belongs to the engine.
+        paused: !!s.paused,
         files: s.files || {},
         // Document title in the editor: the last one seen, and the one from the last send to the engine.
         titles: s.titles || {},
@@ -118,7 +129,7 @@ async function createApiToken(engineUrl, email, password) {
     const token = await readResponse(await fetch(url + '/api/auth/tokens', {
         method: 'POST',
         headers: bearer,
-        body: JSON.stringify({ label: `Agent navigateur (${new Date().toLocaleDateString('fr-FR')})` }),
+        body: JSON.stringify({ label: t('token.browser', { date: new Date().toLocaleDateString(dateLocale()) }) }),
     }));
     try {
         await fetch(url + '/api/auth/logout', { method: 'POST', headers: bearer });
@@ -139,7 +150,7 @@ async function authedConfig() {
     if (!migration) {
         migration = (async () => {
             const { me, token, tokenId } = await createApiToken(config.engineUrl, config.email, config.password);
-            const migrated = { engineUrl: trimUrl(config.engineUrl), email: me.email || config.email, token, tokenId };
+            const migrated = { engineUrl: trimUrl(config.engineUrl), email: me.email || config.email, token, tokenId, language: me.language || '' };
             await chrome.storage.local.set({ config: migrated });
             return migrated;
         })().finally(() => { migration = null; });
@@ -192,7 +203,7 @@ function noteTitle(documentId, title) {
 async function login({ engineUrl, email, password }) {
     const { me, token, tokenId } = await createApiToken(engineUrl, email, password);
     // A new engine may well know the extended metrics the previous one refused.
-    await chrome.storage.local.set({ config: { engineUrl: trimUrl(engineUrl), email: me.email || email, token, tokenId }, extendedUnsupported: false });
+    await chrome.storage.local.set({ config: { engineUrl: trimUrl(engineUrl), email: me.email || email, token, tokenId, language: me.language || '' }, extendedUnsupported: false });
     await setStatus({ state: 'idle' }); // clears any auth_error before the next send
     return me;
 }
@@ -402,10 +413,15 @@ function drain() {
 // The badge carries a state, not the brand: it uses the verdict colors the engine keeps outside
 // its brand guidelines (green / orange / red), not the slate and gold of the rest of the UI.
 async function refreshBadge() {
-    const { queue, status } = await getState();
+    const { queue, status, paused } = await getState();
     let text = 'ON';
     let color = '#137333';
-    if (status.state === 'unconfigured' || status.state === 'auth_error') {
+    if (paused) {
+        // Slate, not a verdict colour: a pause is a choice the student made, not a problem — but
+        // it must be visible on every tab, all the time.
+        text = 'II';
+        color = '#1e293b';
+    } else if (status.state === 'unconfigured' || status.state === 'auth_error') {
         text = 'OFF';
         color = '#c5221f';
     } else if (queue.length > 0) {
@@ -457,12 +473,21 @@ const REQUESTS = {
         return {
             engineUrl: config.engineUrl,
             email: config.email,
+            language: config.language,
             configured: hasAuth(config),
             queued: state.queue.length,
             documents: Object.keys(state.files).length,
             status: state.status,
             extendedDropped: state.extendedUnsupported,
+            paused: state.paused,
         };
+    },
+    // Suspending stops the measurement in every open document; the queue keeps going. The
+    // content scripts flush their window when they see the key change.
+    async CERTIMENS_SET_PAUSED(message) {
+        await chrome.storage.local.set({ paused: !!message.paused });
+        await refreshBadge();
+        return { paused: !!message.paused };
     },
     async CERTIMENS_WHOAMI() {
         const me = await api(await authedConfig(), 'GET', '/api/auth/me');
@@ -479,7 +504,7 @@ const REQUESTS = {
                 await api(config, 'DELETE', `/api/auth/tokens/${config.tokenId}`);
             } catch (_) { /* already revoked or offline: the local token is wiped anyway */ }
         }
-        await chrome.storage.local.set({ config: { engineUrl: config.engineUrl, email: config.email } });
+        await chrome.storage.local.set({ config: { engineUrl: config.engineUrl, email: config.email, language: config.language } });
         return {};
     },
     CERTIMENS_DOC_INFO: (message) => docInfo(message.documentId),
@@ -516,6 +541,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.storage.onChanged.addListener((changes) => {
     if (changes.config) drain();
+    if (changes.paused) refreshBadge();
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -523,6 +549,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 function init() {
+    getConfig().then((config) => setLanguage(config.language, chrome.i18n.getUILanguage()), () => {});
     chrome.alarms.create(RETRY_ALARM, { periodInMinutes: 1 });
     drain();
 }

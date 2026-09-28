@@ -74,6 +74,10 @@ jobs:
         with:
           name: certimens-libreoffice
           path: dist/libreoffice.oxt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: certimens-vscode
+          path: dist/certimens-vscode.vsix
       - name: Install instructions
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
@@ -92,6 +96,8 @@ jobs:
             Ajouter* → \`libreoffice.oxt\`, puis redémarrer LibreOffice.
           - **Word** : \`certimens-word\` dézippé dans \`dist/\` d'un clone du dépôt → \`npm run word:serve\`, puis charger
             \`word-localhost.xml\` dans Word (voir le README).
+          - **VS Code** : \`certimens-vscode\` → \`code --install-extension certimens-vscode.vsix\`
+            (ou *Extensions › … › Installer à partir d'un VSIX*), puis recharger la fenêtre.
           EOF
 
   safari:
@@ -100,7 +106,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: extension
           path: dist

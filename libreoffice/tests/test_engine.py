@@ -108,6 +108,26 @@ class EngineTest(unittest.TestCase):
                                     'period': {'start': '1970-01-01T00:16:40.000Z', 'end': '1970-01-01T00:16:42.000Z'}}])
         self.assertTrue(FakeEngine.calls[-1][3].startswith('Bearer '))
 
+    def test_pause_survives_a_restart_and_does_not_hold_the_queue(self):
+        """Suspending stops the measurement, not the sending.
+
+        A pause that quietly lifted itself at the next start would be worse than none, and a
+        pause that held back what was already measured would turn into a late, suspicious batch
+        the day the student resumes.
+        """
+        self.engine.login(self.url, 'a@b.fr', 'secret')
+        self.engine.enqueue('doc1', 'Mémoire', (1000, 1002), {'total_keystrokes': 5})
+        self.engine.set_paused(True)
+
+        restarted = Engine(self.engine.path)
+        self.assertTrue(restarted.paused())
+        restarted.drain()
+        self.assertEqual(restarted.status()[1], 0)
+        self.assertTrue([c for c in FakeEngine.calls if c[1].endswith('/metrics')])
+
+        restarted.set_paused(False)
+        self.assertFalse(Engine(self.engine.path).paused())
+
     def test_rename_is_synced_once(self):
         self.engine.login(self.url, 'a@b.fr', 'secret')
         self.engine.enqueue('doc1', 'Brouillon', (1000, 1002), {'total_keystrokes': 1})

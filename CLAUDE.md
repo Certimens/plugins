@@ -1,6 +1,6 @@
 # Certimens — plugins
 
-Les **agents de mesure** de Certimens : trois implémentations d'un même capteur de rédaction.
+Les **agents de mesure** de Certimens : quatre implémentations d'un même capteur de rédaction.
 
 Ce dépôt (`Certimens/plugins`) est **autonome**. Le moteur qui reçoit les mesures vit dans un
 autre dépôt (`Certimens/engine`) : il peut être cloné à côté, ou pas du tout. Rien ici ne doit
@@ -14,6 +14,7 @@ explicitement et nomment le fichier concerné côté moteur.
 | `extension/` | extension navigateur MV3 (Google Docs, Word Online) — Chrome, Firefox, Safari, Edge, Opera |
 | `word/` | complément Office pour Word (Office.js, servi par GitHub Pages) |
 | `libreoffice/` | extension Writer en Python/UNO, paquet `.oxt` |
+| `vscode/` | extension Visual Studio Code, paquet `.vsix` — un fichier moteur par fichier du projet |
 | `scripts/` | build des paquets, certificat de dev Word, visuels de marque |
 | `legacy/` | anciens agents de bureau, conservés pour référence — ne pas faire évoluer |
 
@@ -25,14 +26,19 @@ qu'il décrit.
 
 - `mesures-redaction` — **sur toute modification d'un capteur, d'une constante de mesure ou
   d'une metric**, quel que soit le dossier : la définition est unique, les implémentations sont
-  trois.
+  quatre.
 - `extension-navigateur` — travail dans `extension/`, `scripts/build.mjs` ou `eslint.config.js`.
 - `complement-word` — travail dans `word/` ou sur le manifest Office.
 - `extension-libreoffice` — travail dans `libreoffice/`.
+- `extension-vscode` — travail dans `vscode/`.
+- `langues-interface` — **sur tout texte affiché à l'étudiant**, quel que soit l'agent :
+  deux langues, une règle, quatre dictionnaires.
 
 ## Conventions
 
-- **Commentaires de code en anglais ; documentation et textes d'interface en français.**
+- **Commentaires de code en anglais ; documentation en français.** Les textes d'interface
+  existent en **français et en anglais** : ils ne s'écrivent pas en dur, ils s'ajoutent au
+  dictionnaire de l'agent (voir le skill `langues-interface`).
 - Pas de bundler, pas de framework : des scripts classiques côté JavaScript, la bibliothèque
   standard seule côté Python.
 - La version vient de git (tag, ou dernier tag + commit) : **ne jamais l'incrémenter à la main**
@@ -41,8 +47,8 @@ qu'il décrit.
   compteurs.
 
 ```bash
-npm run lint              # ESLint (extension/, word/, scripts/, tests/)
-npm test                  # toute la suite, sans navigateur, sans Word, sans LibreOffice
+npm run lint              # ESLint (extension/, word/, vscode/, scripts/, tests/)
+npm test                  # toute la suite, sans navigateur, sans Word, sans LibreOffice, sans VS Code
 npm run build             # tous les paquets dans dist/
 npm run lint:firefox      # validation AMO (après build)
 npm run lint:word         # validation Microsoft du manifest (après build, réseau requis)

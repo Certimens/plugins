@@ -3,6 +3,12 @@
 Textes à copier dans le tableau de bord. Chaque justification fait moins de 1 000 caractères.
 Ils décrivent ce que fait le code actuel (`extension/`) : à revoir si une autorisation change.
 
+L'extension est livrée en **français et en anglais** : le nom et la description viennent de
+`extension/_locales/{fr,en}/messages.json`, et le Chrome Web Store affiche à l'étudiant celle de
+sa langue. Les fiches de boutique se remplissent donc dans les deux langues (*Store listing* a un
+onglet par langue), à partir de ces messages et des textes ci-dessous — dont la traduction reste
+à faire dans le tableau de bord, le store ne la déduit pas du paquet.
+
 ## Objectif unique
 
 > Mesurer la façon dont l'étudiant rédige un document dans Google Docs ou Word Online (rythme de
@@ -16,7 +22,9 @@ Ils décrivent ce que fait le code actuel (`extension/`) : à revoir si une auto
 > l'étudiant et un jeton d'accès obtenu à la connexion — le mot de passe n'est pas conservé) et le lien entre chaque document
 > Google Docs / Word Online et son fichier Certimens. Sert aussi de file d'attente : quand
 > l'étudiant est hors ligne ou que le serveur ne répond pas, les mesures (des compteurs, jamais
-> de texte) y sont gardées puis envoyées dès que la connexion revient. storage.session retient
+> de texte) y sont gardées puis envoyées dès que la connexion revient. Une clé retient aussi que
+> l'étudiant a suspendu la mesure depuis la fenêtre de l'extension, pour que la suspension
+> s'applique à tous ses documents et survive au redémarrage du navigateur. storage.session retient
 > les documents pour lesquels la fenêtre de l'extension s'est déjà ouverte, pour ne pas la
 > rouvrir pendant la même session.
 
@@ -63,8 +71,20 @@ Données collectées :
 À certifier : les données ne sont ni vendues, ni utilisées ou transférées à des fins sans
 rapport avec l'objectif unique, ni utilisées pour évaluer une solvabilité ou accorder un prêt.
 
-Une **URL de règles de confidentialité** est obligatoire quand des données sont collectées.
-Il faut une page publique sur certimens.fr qui reprenne ces trois catégories.
+Une **URL de règles de confidentialité** est obligatoire quand des données sont collectées, et
+c'est sur ce point que la fiche a déjà été refusée (motif *Purple Nickel*). À déclarer :
+
+> https://certimens.fr/politique-de-confidentialite/
+
+C'est la page du dépôt `Certimens/website`, qui couvre les trois catégories ci-dessus, nomme les
+agents un par un et décrit les durées de conservation réelles. Deux conditions pour qu'elle passe
+la revue :
+
+- **elle doit répondre publiquement à cette URL**, sans connexion. La page `/privacy` de l'espace
+  Certimens ne convient pas : c'est une application React, et un examinateur qui n'exécute pas le
+  JavaScript n'y voit qu'une page vide ;
+- **elle doit parler de l'extension**, pas seulement du site. L'ancienne politique WordPress
+  (`/index.php/elementor-515/`) ne mentionne aucune extension : la déclarer, c'est le refus.
 
 ## Coordonnées
 

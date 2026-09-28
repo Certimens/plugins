@@ -1,11 +1,12 @@
-# Certimens — Agent de rédaction (Google Docs, Word Online, Word, LibreOffice)
+# Certimens — Agent de rédaction (Google Docs, Word Online, Word, LibreOffice, VS Code)
 
 | Dossier      | Contenu                                                                  |
 | ------------ | ------------------------------------------------------------------------ |
 | `extension/` | L'extension navigateur (sources, chargeables telles quelles)             |
 | `word/`      | Le complément Word (Office Add-in), publié sur GitHub Pages              |
 | `libreoffice/` | L'extension LibreOffice Writer (`.oxt`, Python)                        |
-| `scripts/`   | `build.mjs` : paquets `dist/{chrome,firefox,safari}.zip` ; `safari.sh` : projet Xcode |
+| `vscode/`    | L'extension Visual Studio Code (`.vsix`), pour les devoirs rendus en code |
+| `scripts/`   | `build.mjs` : tous les paquets dans `dist/` ; `safari.sh` : projet Xcode |
 | `store/`     | Visuels et textes des fiches des stores (non inclus dans l'extension)    |
 | `legacy/`    | Anciens agents de bureau et « Web Shield », plus utilisés (voir son README) |
 
@@ -171,6 +172,100 @@ redémarrer LibreOffice. En ligne de commande : `unopkg add dist/libreoffice.oxt
 déposer à la main le `.oxt` de chaque release GitHub (`certimens-agent-X.Y.Z-libreoffice.oxt`).
 L'identifiant `fr.certimens.agent` (`description.xml`) ne doit plus changer.
 
+## Extension VS Code
+
+Une extension pour **Visual Studio Code** dans `vscode/`, paquet `dist/certimens-vscode.vsix`
+(VS Code 1.90+), pour les devoirs qui se rendent en code plutôt qu'en traitement de texte. C'est
+le seul agent qui mesure **un projet entier, fichier par fichier** : chaque fichier écrit devient
+un fichier Certimens distinct, avec ses propres fenêtres de mesure — ce qu'un enseignant corrige,
+ce sont des fichiers, pas un projet en bloc.
+
+- `sensor.js` : les fenêtres de mesure, une instance par document ouvert, sans aucune dépendance
+  à l'API de VS Code — c'est ce qui rend les règles vérifiables sans éditeur
+  (`tests/vscode-sensor.test.mjs`).
+- `engine.js` : moteur et file hors-ligne (stockage global de l'extension), jeton d'API dans le
+  **SecretStorage** de l'éditeur et non dans `settings.json`, qui se synchronise entre machines et
+  se lit par-dessus l'épaule. Pas de CORS : les appels partent de Node, pas d'une page.
+- `extension.js` : l'hôte. Il traduit les événements de l'éditeur en mesures, tient un capteur par
+  document, la barre d'état et les commandes.
+- `panel.js` : le panneau latéral (webview), le même écran que la popup de l'extension et que le
+  volet Word ; il réutilise `ui.css`, ne détient aucun état et ne voit jamais le jeton.
+
+VS Code ne livre pas les frappes : il signale **ce qui change** dans le document
+(`onDidChangeTextDocument`, un événement par modification, avec le texte inséré et la longueur de
+ce qu'il remplace) et **d'où vient le curseur** (`onDidChangeTextEditorSelection`, avec l'origine
+du déplacement : clavier, souris ou commande). C'est plus que ce que donne Office — l'origine d'un
+déplacement étant connue, la règle « une suppression solde le déplacement qui la précède » y tient
+— et moins qu'un navigateur, aucune touche n'étant jamais vue. Un déplacement qui suit une frappe
+de moins de 50 ms est l'écho du curseur, pas une navigation : sans cette règle,
+`navigation_jumps` suivrait exactement `total_keystrokes`.
+
+**Rien n'est créé tant que l'étudiant n'a pas écrit** : ouvrir un projet de quatre cents fichiers
+n'en crée aucun côté moteur. Le réglage `certimens.exclude` écarte en plus les dépendances, la
+sortie de compilation et les fichiers générés.
+
+Un fichier est identifié par un condensé du chemin du dossier de travail et son chemin **relatif**
+dans le projet ; ce qui part au moteur est `projet/chemin/du/fichier`, jamais le chemin absolu,
+qui nomme le compte de l'étudiant. Un fichier renommé ou déplacé garde ses mesures : le fichier
+moteur est renommé (`PUT /api/files/:id`), pas remplacé.
+
+**Rendre un fichier** : la commande *Certimens : rendre ce fichier* (palette de commandes, ou le
+bouton du panneau) envoie le fichier ouvert (`PUT /api/files/:id`, base64, 18 Mo maximum) puis
+propose les devoirs auxquels l'étudiant est rattaché. C'est **la seule** action qui fait sortir du
+texte du poste ; la mesure, elle, n'envoie que des compteurs.
+
+**Installer** : `code --install-extension dist/certimens-vscode.vsix`, ou *Extensions › … ›
+Installer à partir d'un VSIX*. En développement, `npm run vscode:dev` construit le paquet et ouvre
+une fenêtre VS Code sur `dist/vscode/` — le dossier `vscode/` seul ne suffit pas, `media/` (la
+feuille de style, les polices et l'icône partagées avec l'extension navigateur) est rempli par le
+build.
+
+**Côté moteur** : la famille de client `vscode` doit être connue de
+`internal/file/adapters/inbound/http/ingestion.go` (dépôt `Certimens/engine`), sinon chaque envoi
+est marqué `client_unknown` sur le fichier. L'agent s'annonce par son `User-Agent`
+(`Certimens-VSCode/X.Y.Z (VS Code … ; Node …)`) : contrairement à un navigateur ou à `urllib`,
+Node n'ajoute de lui-même aucun en-tête qui le trahisse.
+
+## Langues
+
+Les agents parlent **français et anglais**. Le français est la langue par défaut : le produit est
+vendu à l'enseignement supérieur français, et une locale inconnue y atterrit plutôt que dans une
+langue que l'établissement n'utilise pas.
+
+La règle est celle du moteur (`internal/user/domain.NormalizeLanguage`) : **une étiquette qui
+commence par `en` donne l'anglais, tout le reste donne le français.** Elle est réimplémentée dans
+chaque agent plutôt que demandée au moteur — un agent doit choisir sa langue avant d'avoir jamais
+joint le moteur. La langue vient, dans cet ordre :
+
+1. **le compte Certimens**, dont la langue arrive avec la réponse de connexion (`me.language`) et
+   est conservée dans la configuration de l'agent ;
+2. **la langue de l'hôte** — le navigateur, Word, LibreOffice, l'éditeur ;
+3. **le français**.
+
+Le compte l'emporte parce que c'est la langue que l'étudiant a choisie dans son espace, et celle
+de ses e-mails.
+
+| Agent | Textes de l'interface | Fiche et manifest |
+| --- | --- | --- |
+| Navigateur | `extension/i18n.js` | `extension/_locales/{fr,en}/messages.json` (`__MSG_…__` dans le manifest) |
+| Word | `extension/i18n.js`, partagé et copié par le build | `<Override Locale="en-us">` dans `word/manifest.xml` |
+| LibreOffice | `libreoffice/pythonpath/certimens_agent/i18n.py` | `description.xml` et `description/description-{fr,en}.txt` |
+| VS Code | `vscode/i18n.js` | `vscode/package.nls.json` (français, le repli) et `package.nls.en.json` |
+
+Le manifest d'un agent est lu **avant** notre code : c'est l'hôte qui le traduit, d'après sa
+propre langue d'interface. Le nom dans la barre d'outils peut donc être anglais pendant que le
+volet est français, si le compte dit l'anglais et le navigateur le français. Rien d'autre n'est
+possible pour un texte que l'hôte lit avant nous.
+
+Aucune page ne porte plus de texte en dur : `data-i18n="clé"` côté extension et Word, injection à
+la construction côté VS Code. Les suites vérifient la parité des clés, les variables (`{title}`,
+`{count}`) et le fait qu'une clé commune à deux agents porte bien le **même** message
+(`tests/i18n.test.mjs`, `libreoffice/tests/test_i18n.py`).
+
+Ajouter une troisième langue commence **côté moteur** : `domain.NormalizeLanguage` n'en connaît
+que deux, et l'étudiant choisirait sinon dans son espace une langue que le moteur refuse
+d'enregistrer.
+
 ## Metrics envoyées
 
 | Type                      | Mesure                                                                 |
@@ -209,7 +304,17 @@ auparavant qu'une injection, jamais une révision.
 Le complément Word n'est pas concerné : il travaille par différences de texte et voyait déjà le
 remplacement. L'agent LibreOffice suit la même logique que l'extension, à ceci près que son
 gestionnaire de clic ne donne pas de coordonnées — une sélection tracée à la souris n'y est donc
-pas détectable.
+pas détectable. L'extension VS Code voit le remplacement dans la modification elle-même (elle
+porte la longueur de ce qu'elle efface) et connaît l'origine du déplacement, donc les trois cases
+de révision y sont distinguées comme dans le navigateur.
+
+**`paste_events` n'est pas envoyée par l'extension VS Code.** Une insertion faite en un coup peut
+y être un collage, un extrait de code ou une complétion acceptée — d'IntelliSense comme d'un
+assistant — et l'éditeur ne dit pas laquelle. Les caractères comptent bien dans
+`total_injected_chars`, c'est même là qu'une réponse générée se voit ; le *nombre* de collages,
+lui, serait faux, et une mesure fausse vaut moins que pas de mesure. Les flight times ne
+retiennent pour la même raison que les modifications de la taille d'une frappe : une complétion
+acceptée d'un coup se lirait sinon comme un dactylographe impossiblement rapide et régulier.
 
 **Une pause va de 3 s à 5 minutes.** Le plafond était à 60 s, ce qui faisait compter *rien du
 tout* — ni pause, ni temps effectif — toute délibération de plus d'une minute, alors que s'arrêter
@@ -226,6 +331,32 @@ Les trois dernières metrics sont déclarées dans `internal/db/file.go` du mote
 qui les refuse (`400 metric_type_unknown`), l'agent les retire et renvoie le reste ; il réessaie à
 la prochaine connexion. Tout autre `400` (période invalide, corps mal formé) ne les désactive
 pas — c'était le cas avant, et `focus_losses` ne repartait jamais.
+
+## Suspendre la mesure
+
+Les quatre agents ont un bouton qui **suspend la mesure** : la popup de l'extension, le volet du
+complément Word, la fenêtre **Certimens** de LibreOffice et le panneau VS Code (ou la commande
+*Certimens : suspendre ou reprendre la mesure*).
+
+Le comportement est le même partout :
+
+- **la mesure s'arrête, pas l'envoi.** La file continue de partir : ce qui a été mesuré avant la
+  pause appartient déjà au moteur. Le retenir ne ferait que transformer la pause en un lot tardif,
+  que le moteur signalerait (`late_ingestion`, `multi_window_batch`) ;
+- **la fenêtre en cours est vidée** au moment de suspendre : rien de mesuré n'est perdu, rien ne
+  s'accumule derrière un capteur suspendu ;
+- **pendant la pause, rien n'est compté** : ni frappe, ni temps effectif, ni pause cognitive.
+  Ce n'est pas « mesurer sans envoyer » ;
+- **la suspension dure** : elle survit au redémarrage du navigateur, de Word, de LibreOffice ou de
+  VS Code, et seule une reprise explicite la lève. L'état est affiché en permanence — badge `II`
+  sur l'icône de l'extension, bandeau dans le volet, barre d'état de VS Code — parce que le seul
+  état qu'un agent de mesure ne doit jamais produire, c'est « suspendu mais qui en a l'air actif ».
+
+La suspension est **globale à l'agent**, pas par document : c'est l'étudiant qui suspend.
+
+Côté moteur, rien n'est déclaré : le trou reste lisible dans le nombre de fenêtres et dans
+l'`unmeasured_ratio` du fichier — la part du document qu'aucune mesure n'explique. Un devoir écrit
+pour moitié pendant une pause le montre là.
 
 ### Mode debug
 
@@ -295,6 +426,7 @@ npm run build:safari  # macOS : projet Xcode dans dist/safari-xcode/, compilé s
 npm run lint:word     # validation Microsoft du manifest Word (après build, réseau requis)
 npm run word:serve    # complément Word sur https://localhost:3000 (après build)
 npm run test:libreoffice  # tests de l'extension LibreOffice (Python 3)
+npm run vscode:dev    # construit le paquet VS Code et ouvre une fenêtre dessus
 ```
 
 ### Versions
@@ -354,8 +486,10 @@ npx --yes --package sharp -- node scripts/brand-assets.mjs
 ## CI et publication
 
 - **CI** (`.github/workflows/ci.yml`) : lint, build et validation Firefox sur chaque branche et
-  PR ; les zips sont joints au run (artefact `extension`). Un job macOS convertit le paquet
-  Safari, compile l'app sans signature et joint le projet Xcode (artefact `safari-xcode`).
+  PR ; les zips sont joints au run (artefact `extension`), comme le `.oxt` LibreOffice et le
+  `.vsix` VS Code (artefacts `certimens-libreoffice` et `certimens-vscode`). Un job macOS
+  convertit le paquet Safari, compile l'app sans signature et joint le projet Xcode (artefact
+  `safari-xcode`).
 - **Dépendances** (`.github/dependabot.yml`) : Dependabot suit chaque lundi les paquets npm de
   l'outillage et les actions des workflows (les mises à jour mineures et correctives arrivent
   groupées, les majeures séparément). Rien pour l'extension LibreOffice : son code Python n'a que
@@ -373,7 +507,11 @@ npx --yes --package sharp -- node scripts/brand-assets.mjs
      AppSource tant que le manifest ne change pas ;
   3. l'extension LibreOffice (`certimens-agent-X.Y.Z-libreoffice.oxt`) est jointe à la release,
      à déposer à la main sur extensions.libreoffice.org ;
-  4. ces mêmes fichiers sont publiés sur le Chrome Web Store, addons.mozilla.org et, s'ils sont
+  4. l'extension VS Code (`certimens-agent-X.Y.Z-vscode.vsix`) est jointe à la release et publiée
+     sur le Visual Studio Marketplace si `VSCE_PAT` est configuré. Le Marketplace n'accepte que
+     des versions `X.Y.Z` : un build de branche, versionné `X.Y.Z-commit`, n'est donc jamais
+     publiable — c'est voulu ;
+  5. ces mêmes fichiers sont publiés sur le Chrome Web Store, addons.mozilla.org et, s'ils sont
      configurés, Edge Add-ons et Opera Add-ons (`publish-browser-extension`), un job par store.
      Un store en échec ne bloque ni les autres ni la release GitHub : relancer son job seul
      (*Re-run failed jobs*).
@@ -394,7 +532,9 @@ quelques jours).
 
 La **première** publication se fait à la main dans chaque store ; la CI ne sait que mettre à
 jour une extension existante. Chaque fiche demande une adresse d'assistance : partout
-`contact@certimens.fr`, avec `https://certimens.fr` comme site.
+`contact@certimens.fr`, avec `https://certimens.fr` comme site. Les paquets portent le nom et la
+description dans les deux langues, mais **aucune boutique ne traduit la fiche à partir du
+paquet** : chacune a un onglet par langue, à remplir à la main (textes dans `store/`).
 
 **Chrome Web Store**
 
@@ -430,6 +570,22 @@ Extensions*). Pour une fiche sur [addons.opera.com](https://addons.opera.com/dev
 soumettre `dist/chrome.zip` avec l'image promotionnelle `store/opera-300x188.png`, relever l'ID
 du paquet. Opera n'a pas d'API : la CI utilise le
 cookie `sessionid` du compte développeur, à renouveler quand il expire.
+
+**Visual Studio Marketplace**
+
+1. Créer une organisation sur [Azure DevOps](https://dev.azure.com) avec le compte Microsoft de
+   Certimens, puis un **éditeur** (*publisher*) `certimens` sur le
+   [portail Marketplace](https://marketplace.visualstudio.com/manage) — l'identifiant doit être
+   celui du champ `publisher` de `vscode/package.json`, il ne change plus une fois publié.
+2. Créer un **jeton d'accès personnel** (Azure DevOps › *User settings › Personal access tokens*)
+   pour *All accessible organizations*, portée *Marketplace › Manage*, et l'enregistrer dans le
+   secret `VSCE_PAT` du dépôt.
+3. Première publication à la main : `npx vsce publish --packagePath dist/certimens-vscode.vsix`.
+   Les suivantes partent de la release.
+
+**Open VSX** (facultatif, pour VSCodium, Cursor et Gitpod) : dépôt distinct de Microsoft, sans
+publication automatisée ici — déposer le `.vsix` de la release à la main sur
+[open-vsx.org](https://open-vsx.org).
 
 **Safari (App Store)**
 

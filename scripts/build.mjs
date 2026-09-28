@@ -16,6 +16,10 @@
 // The LibreOffice extension goes into dist/libreoffice.oxt: the libreoffice/ files (without its
 // tests), the extension/manifest.json version injected into description.xml, and the icons.
 //
+// The VS Code extension goes into dist/certimens-vscode.vsix (and dist/vscode/, the unpacked
+// folder `code --extensionDevelopmentPath` loads): the vscode/ files, plus the extension's
+// stylesheet, fonts and icon under media/, and the resolved version in its package.json.
+//
 // Versions come from git, so nothing has to be bumped by hand before a release:
 //   --release vX.Y.Z  the tag drives every package (used by the release workflow);
 //   otherwise         the last tag plus the current commit, e.g. 1.4.2-a9085f3, so any build
@@ -36,14 +40,24 @@ const dist = join(root, 'dist');
 const WORD_BASE_URL = (process.env.WORD_BASE_URL || 'https://certimens.github.io/plugins/word').replace(/\/+$/, '');
 const WORD_DEV_URL = 'https://localhost:3000';
 // What the Word add-in reuses from the extension.
-const WORD_SHARED = ['ui.css', 'ui.js', 'fonts', 'icons/icon16.png', 'icons/icon32.png', 'icons/icon128.png'];
+const WORD_SHARED = ['ui.css', 'ui.js', 'i18n.js', 'fonts', 'icons/icon16.png', 'icons/icon32.png', 'icons/icon128.png'];
+// What the VS Code panel reuses from it, under media/ (the one folder its webview may read).
+// ui.css asks for fonts/ next to itself, hence the whole folder.
+const VSCODE_SHARED = { 'ui.css': 'ui.css', 'fonts': 'fonts', 'icons/icon128.png': 'icon128.png' };
 
 const manifest = JSON.parse(readFileSync(join(source, 'manifest.json'), 'utf8'));
 
-// Chrome Web Store and Opera Add-ons limit; they reject the package beyond it.
-if (manifest.description.length > 132) {
-    console.error(`Description du manifest trop longue (${manifest.description.length} caractères, 132 maximum).`);
-    process.exit(1);
+// The store listing's name and description come from _locales/, not from the manifest, so the
+// length is checked there — once per language, since each one is what its own store listing shows.
+// Chrome Web Store and Opera Add-ons reject a package beyond 132 characters.
+const LOCALES = ['fr', 'en'];
+for (const locale of LOCALES) {
+    const messages = JSON.parse(readFileSync(join(source, '_locales', locale, 'messages.json'), 'utf8'));
+    const description = messages.extensionDescription.message;
+    if (description.length > 132) {
+        console.error(`Description trop longue en ${locale} (${description.length} caractères, 132 maximum) : extension/_locales/${locale}/messages.json`);
+        process.exit(1);
+    }
 }
 
 function git(...args) {
@@ -130,6 +144,26 @@ writeFileSync(join(loDir, 'description.xml'),
     readFileSync(join(loSource, 'description.xml'), 'utf8').replaceAll('{{VERSION}}', label));
 execFileSync('zip', ['-qr', '-X', join(dist, 'libreoffice.oxt'), '.'], { cwd: loDir, stdio: 'inherit' });
 console.log(`dist/libreoffice.oxt (${label})`);
+
+// The marketplace wants a three-part version, and nothing but digits: a branch build's label
+// (1.4.2-a9085f3) is not one, so the traceable form stays out of the package and in dist/VERSION.
+const vscodeVersion = [...version.split('.'), '0', '0'].slice(0, 3).join('.');
+const vscodeSource = join(root, 'vscode');
+const vscodeDir = join(dist, 'vscode');
+cpSync(vscodeSource, vscodeDir, { recursive: true, filter: (path) => !path.endsWith('.md') });
+for (const [from, to] of Object.entries(VSCODE_SHARED)) {
+    cpSync(join(source, from), join(vscodeDir, 'media', to), { recursive: true });
+}
+const vscodeManifest = JSON.parse(readFileSync(join(vscodeSource, 'package.json'), 'utf8'));
+vscodeManifest.version = vscodeVersion;
+writeFileSync(join(vscodeDir, 'package.json'), JSON.stringify(vscodeManifest, null, 4) + '\n');
+// The marketplace page is the extension's own README; the repository's stays the reference.
+cpSync(join(vscodeSource, 'README.md'), join(vscodeDir, 'README.md'));
+// --no-dependencies: the extension ships classic scripts and depends on nothing to install.
+execFileSync(join(root, 'node_modules', '.bin', 'vsce'),
+    ['package', '--no-dependencies', '--skip-license', '--out', join(dist, 'certimens-vscode.vsix')],
+    { cwd: vscodeDir, stdio: 'inherit' });
+console.log(`dist/certimens-vscode.vsix (${vscodeVersion})`);
 
 // Read back by the workflows, so the version is resolved here and nowhere else.
 writeFileSync(join(dist, 'VERSION'), label + '\n');

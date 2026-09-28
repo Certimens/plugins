@@ -100,13 +100,18 @@ function hasActivity() {
 }
 
 // --- 1. WORD EVENTS ---
+// A suspended measurement counts nothing, but keeps *reading*: the baseline goes on refreshing
+// on its own timer (see BASELINE_REFRESH_MS), so what the student writes during the pause
+// becomes the new reference instead of landing, all at once, in the first window after it.
 function noteLocalEvent() {
+    if (isPaused()) return;
     pendingEvents.push(Date.now());
     scheduleRead();
 }
 
 // Empty selection or not: deleting a selection is a macro-revision.
 function onSelectionChanged() {
+    if (isPaused()) return;
     noteLocalEvent();
     Office.context.document.getSelectedDataAsync(Office.CoercionType.Text, (result) => {
         if (result.status === Office.AsyncResultStatus.Succeeded) rangeSelected = chars(result.value) > 0;
@@ -266,5 +271,7 @@ async function startSensor() {
     await readText(); // first read: the reference, nothing is counted
     setInterval(scheduleRead, BASELINE_REFRESH_MS);
     watchTitle();
-    window.addEventListener('pagehide', () => flush('pagehide'));
+    window.addEventListener('pagehide', () => {
+        if (!isPaused()) flush('pagehide');
+    });
 }

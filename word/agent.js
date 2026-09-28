@@ -51,7 +51,9 @@ function save(key, value) {
 function getConfig() {
     // token: API token (Bearer) kept in place of the password. tokenId: its identifier,
     // used to revoke it on logout. password: legacy setting, migrated on the next send.
-    return { engineUrl: DEFAULT_ENGINE_URL, email: '', token: '', tokenId: '', ...load('config', {}) };
+    // language: the account's own, sent by the engine at login, so the task pane opens in the
+    // language the student chose in their Certimens space.
+    return { engineUrl: DEFAULT_ENGINE_URL, email: '', token: '', tokenId: '', language: '', ...load('config', {}) };
 }
 
 // A config can authenticate if it carries a token, or a legacy password still to be migrated.
@@ -69,6 +71,22 @@ function getState() {
         status: load('status', { state: 'idle' }),
         extendedUnsupported: load('extendedUnsupported', false),
     };
+}
+
+// --- SUSPENDED MEASUREMENT ---
+// Read from storage on every call rather than cached: each open document runs its own instance
+// of the add-in, and they share this origin's localStorage but not their memory. A pause set in
+// one document has to reach the sensors of the others, which only ever look here.
+//
+// Suspending stops the *measurement*, not the sending: a window already measured is the
+// engine's, and the queue keeps draining.
+function isPaused() {
+    return load('paused', false);
+}
+
+function setPaused(paused) {
+    save('paused', !!paused);
+    statusListeners.forEach((listener) => listener());
 }
 
 const statusListeners = [];
@@ -230,7 +248,7 @@ async function createApiToken(engineUrl, email, password) {
     const token = await readResponse(await request(url + '/api/auth/tokens', {
         method: 'POST',
         headers: bearer,
-        body: JSON.stringify({ label: `Complément Word (${new Date().toLocaleDateString('fr-FR')})` }),
+        body: JSON.stringify({ label: t('token.word', { date: new Date().toLocaleDateString(dateLocale()) }) }),
     }));
     try {
         await request(url + '/api/auth/logout', { method: 'POST', headers: bearer });
@@ -260,7 +278,7 @@ async function authedConfig() {
                 } catch (_) { /* offline: the duplicate stays revocable from the Certimens space */ }
                 return fresh;
             }
-            const migrated = { engineUrl: trimUrl(config.engineUrl), email: me.email || config.email, token, tokenId };
+            const migrated = { engineUrl: trimUrl(config.engineUrl), email: me.email || config.email, token, tokenId, language: me.language || '' };
             save('config', migrated);
             return migrated;
         })().finally(() => { migration = null; });
@@ -305,7 +323,7 @@ function noteTitle(docId, title) {
 // Login from the task pane: the password is exchanged for an API token, the only thing kept.
 async function login({ engineUrl, email, password }) {
     const { me, token, tokenId } = await createApiToken(engineUrl, email, password);
-    save('config', { engineUrl: trimUrl(engineUrl), email: me.email || email, token, tokenId });
+    save('config', { engineUrl: trimUrl(engineUrl), email: me.email || email, token, tokenId, language: me.language || '' });
     setStatus({ state: 'idle' }); // clears any pending auth_error before the next send
     drain();
     return me;
@@ -318,7 +336,7 @@ async function logout() {
             await api(config, 'DELETE', `/api/auth/tokens/${config.tokenId}`);
         } catch (_) { /* already revoked or offline: the local token is erased anyway */ }
     }
-    save('config', { engineUrl: config.engineUrl, email: config.email });
+    save('config', { engineUrl: config.engineUrl, email: config.email, language: config.language });
     setStatus({ state: 'unconfigured' });
 }
 

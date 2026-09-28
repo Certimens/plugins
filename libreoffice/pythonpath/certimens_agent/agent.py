@@ -11,6 +11,7 @@ import unohelper
 from com.sun.star.document import XDocumentEventListener
 
 from .engine import Engine
+from .i18n import office_language, set_language
 from .sensor import DocumentSensor, is_writer
 
 _lock = threading.Lock()
@@ -26,6 +27,8 @@ class Agent(unohelper.Base, XDocumentEventListener):
         self.sensors = {}
 
     def start(self):
+        # The account's language if the student is already logged in, LibreOffice's otherwise.
+        set_language(self.engine.config().get('language'), office_language(self.ctx))
         self.engine.start()
         broadcaster = self.ctx.getValueByName('/singletons/com.sun.star.frame.theGlobalEventBroadcaster')
         broadcaster.addDocumentEventListener(self)

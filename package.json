@@ -10,6 +10,7 @@
     "test": "npm run test:js && npm run test:libreoffice",
     "test:js": "node --test \"tests/**/*.test.mjs\"",
     "build": "node scripts/build.mjs",
+    "vscode:dev": "npm run build && code --extensionDevelopmentPath=dist/vscode",
     "lint:firefox": "web-ext lint --source-dir dist/firefox --self-hosted=false --warnings-as-errors",
     "build:safari": "scripts/safari.sh",
     "word:serve": "node scripts/serve-word.mjs",
@@ -18,6 +19,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@vscode/vsce": "3.6.2",
     "eslint": "10.11.0",
     "globals": "17.12.0",
     "office-addin-dev-certs": "3.0.0",

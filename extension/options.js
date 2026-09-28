@@ -1,37 +1,14 @@
-const STATUS_LABEL = {
-    idle: 'En attente de mesures',
-    synced: '🟢 Synchronisé',
-    offline: '🟠 Moteur injoignable — les mesures sont conservées et renvoyées chaque minute',
-    auth_error: '🔴 Identifiants refusés',
-    unconfigured: '🔴 Agent non configuré',
-};
-
-// Debug journal: what each measurement window carried, in the wording of the engine's page.
-const COUNTER_LABELS = {
-    total_keystrokes: 'frappes',
-    immediate_corrections: 'corrections immédiates',
-    deferred_reformulations: 'reformulations différées',
-    macro_revisions: 'révisions massives',
-    navigation_jumps: 'sauts de navigation',
-    cognitive_pauses: 'pauses',
-    paste_events: 'collages',
-    focus_losses: 'sorties du document',
-    total_injected_chars: 'caractères injectés',
-    effective_time_seconds: 's effectives',
-    real_volume: 'caractères dans le document',
-    median_flight_ms: 'ms entre frappes (médiane)',
-    mad_ms: 'ms d\'écart médian',
-};
-
 const fields = { engineUrl: $('engineUrl'), email: $('email'), password: $('password') };
 
 async function load() {
     const { config } = await chrome.storage.local.get('config');
+    // The account's language, as soon as it is known; the browser's until then.
+    startLanguage(config);
     fields.engineUrl.value = config?.engineUrl || DEFAULT_ENGINE_URL;
     fields.email.value = config?.email || '';
     // The password isn't stored (only a token is): the field stays empty, filled in at
     // login and, once the token is obtained, never asked again.
-    if (config?.token) showMessage(`Connecté : ${config.email}. Reconnectez-vous pour changer de compte.`, true);
+    if (config?.token) showMessage(t('login.reconnectToChange', { email: config.email }), true);
 }
 
 async function refreshStatus() {
@@ -39,12 +16,13 @@ async function refreshStatus() {
     if (!s?.ok) return;
     $('status').replaceChildren(
         ...[
-            `État : ${STATUS_LABEL[s.status.state] || s.status.state}`,
-            s.status.message ? `Détail : ${s.status.message}` : null,
-            `Mesures en attente d'envoi : ${s.queued}`,
-            `Documents suivis : ${s.documents}`,
-            s.extendedDropped ? 'Mesures étendues (collages, sorties, cadence) refusées par le moteur : elles ne sont plus envoyées. Reconnectez-vous pour réessayer.' : null,
-            s.status.at ? `Dernière tentative : ${new Date(s.status.at).toLocaleString('fr-FR')}` : null,
+            s.paused ? t('pause.status') : null,
+            t('status.state', { state: t(`status.${s.status.state}`) }),
+            s.status.message ? t('status.detail', { message: s.status.message }) : null,
+            t('status.queued', { count: s.queued }),
+            t('status.documents', { count: s.documents }),
+            s.extendedDropped ? t('status.extendedDropped') : null,
+            s.status.at ? t('status.lastAttempt', { at: new Date(s.status.at).toLocaleString(dateLocale()) }) : null,
         ].filter(Boolean).map((line) => Object.assign(document.createElement('div'), { textContent: line })),
     );
 }
@@ -66,7 +44,7 @@ $('form').addEventListener('submit', async (e) => {
     button.disabled = false;
     if (res.ok) {
         fields.password.value = '';
-        showMessage(`Connecté en tant que ${res.me.email}.`, true);
+        showMessage(t('login.loggedInAs', { email: res.me.email }), true);
     } else {
         showMessage(errorText(res), false);
     }
@@ -74,9 +52,9 @@ $('form').addEventListener('submit', async (e) => {
 });
 
 $('test').addEventListener('click', async () => {
-    showMessage('Test en cours…', true);
+    showMessage(t('options.testing'), true);
     const res = await chrome.runtime.sendMessage({ type: 'CERTIMENS_WHOAMI' });
-    if (res.ok) showMessage(`Connecté en tant que ${res.me.email} (${res.me.role}).`, true);
+    if (res.ok) showMessage(t('options.testedAs', { email: res.me.email, role: res.me.role }), true);
     else showMessage(errorText(res), false);
     refreshStatus();
 });
@@ -87,11 +65,11 @@ async function refreshDebug() {
     const lines = [...debugLog].reverse().map((entry) => {
         const counters = Object.entries(entry.values)
             .filter(([, value]) => value)
-            .map(([type, value]) => `${value} ${COUNTER_LABELS[type] || type}`);
-        const time = new Date(entry.at).toLocaleTimeString('fr-FR');
-        return `${time} · ${entry.reason} · ${counters.join(', ') || 'aucun compteur'}`;
+            .map(([type, value]) => `${value} ${t(`counter.${type}`)}`);
+        const time = new Date(entry.at).toLocaleTimeString(dateLocale());
+        return `${time} · ${entry.reason} · ${counters.join(', ') || t('counter.none')}`;
     });
-    $('debugLog').replaceChildren(...(lines.length ? lines : ['Journal vide.'])
+    $('debugLog').replaceChildren(...(lines.length ? lines : [t('options.emptyLog')])
         .map((line) => Object.assign(document.createElement('div'), { textContent: line })));
 }
 

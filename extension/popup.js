@@ -17,10 +17,10 @@ async function activeDocument() {
     }
 }
 
-let current = { engineUrl: DEFAULT_ENGINE_URL, doc: null, fileId: null, assignmentId: null };
+let current = { engineUrl: DEFAULT_ENGINE_URL, doc: null, fileId: null, assignmentId: null, paused: false };
 
 function formatDeadline(iso) {
-    return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+    return new Date(iso).toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short' });
 }
 
 // The student's assignments, sorted by deadline; overdue assignments stay listed but flagged.
@@ -30,10 +30,10 @@ async function loadAssignments() {
     const assignments = res.ok ? res.assignments : [];
     assignments.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
     select.replaceChildren(
-        Object.assign(document.createElement('option'), { value: '', textContent: current.fileId ? '— Choisir un devoir —' : '— Aucun devoir pour l\'instant —' }),
+        Object.assign(document.createElement('option'), { value: '', textContent: t(current.fileId ? 'assignment.choose' : 'assignment.none') }),
         ...assignments.map((a) => Object.assign(document.createElement('option'), {
             value: a.id,
-            textContent: `${a.title} (${new Date(a.deadline) < new Date() ? 'échu le' : 'avant le'} ${formatDeadline(a.deadline)})`,
+            textContent: t(new Date(a.deadline) < new Date() ? 'assignment.overdue' : 'assignment.due', { title: a.title, date: formatDeadline(a.deadline) }),
         })),
     );
     select.value = current.assignmentId || '';
@@ -50,7 +50,9 @@ function showLinked(file) {
     $('linkedName').textContent = file.document_name;
     $('open').href = `${current.engineUrl}/file/${file.id}`;
     $('submitted').hidden = !file.assignment_id;
-    $('submitted').textContent = file.assignment_title ? `Rendu sur : ${file.assignment_title}` : 'Rendu sur un devoir';
+    $('submitted').textContent = file.assignment_title
+        ? t('doc.submittedTo', { title: file.assignment_title })
+        : t('doc.submittedGeneric');
     showUpload(file);
     updateSubmitButton();
 }
@@ -60,21 +62,21 @@ function showUpload(file) {
     $('exportDocx').hidden = !canExport;
     $('pickDocx').hidden = canExport;
     $('uploadHint').textContent = [
-        file.content_type ? 'Un document est déjà envoyé : un nouvel envoi le remplace.' : null,
-        canExport ? null : 'Dans Word : Fichier › Enregistrer sous › Télécharger une copie, puis choisissez ce fichier.',
+        file.content_type ? t('doc.alreadyUploaded') : null,
+        canExport ? null : t('doc.wordSaveHint'),
     ].filter(Boolean).join(' ');
 }
 
 function updateSubmitButton() {
     const chosen = $('assignment').value;
     $('submit').hidden = !current.fileId || $('assignmentBox').hidden || !chosen || chosen === current.assignmentId;
-    $('submit').textContent = current.assignmentId ? 'Changer de devoir' : 'Rendre sur ce devoir';
+    $('submit').textContent = t(current.assignmentId ? 'doc.changeAssignment' : 'doc.submit');
 }
 
 async function submitTo(fileId, assignmentId) {
     const res = await chrome.runtime.sendMessage({ type: 'CERTIMENS_SUBMIT_FILE', fileId, assignmentId });
     if (!res.ok) {
-        showMessage(res.status === 403 ? `Rendu impossible : ${res.message}.` : errorText(res), false);
+        showMessage(res.status === 403 ? t('submit.refused', { message: res.message }) : errorText(res), false);
         return null;
     }
     return res.file;
@@ -82,6 +84,8 @@ async function submitTo(fileId, assignmentId) {
 
 async function render() {
     const s = await chrome.runtime.sendMessage({ type: 'CERTIMENS_STATUS' });
+    // The account's language, as soon as it is known; the browser's until then.
+    startLanguage(s);
     current.engineUrl = s.engineUrl || DEFAULT_ENGINE_URL;
     const loggedIn = s.configured && s.status.state !== 'auth_error';
     $('login').hidden = loggedIn;
@@ -90,11 +94,16 @@ async function render() {
     if (!loggedIn) {
         $('engineUrl').value = current.engineUrl;
         $('email').value = s.email || '';
-        if (s.status.state === 'auth_error') showMessage('Identifiants refusés : reconnectez-vous.', false);
+        if (s.status.state === 'auth_error') showMessage(t('error.authRefused'), false);
         return;
     }
 
     $('who').textContent = s.email;
+    // The suspension is global: it is shown whether or not a document is open in this tab.
+    current.paused = s.paused;
+    $('pausedAlert').hidden = !s.paused;
+    $('pause').textContent = t(s.paused ? 'pause.resume' : 'pause.suspend');
+
     current.doc = await activeDocument();
     $('doc').hidden = !current.doc;
     $('noDoc').hidden = !!current.doc;
@@ -124,7 +133,7 @@ $('login').addEventListener('submit', async (e) => {
     if (!engineUrl) return;
     const button = e.submitter;
     button.disabled = true;
-    showMessage('Connexion…', true);
+    showMessage(t('login.connecting'), true);
     const res = await chrome.runtime.sendMessage({
         type: 'CERTIMENS_LOGIN',
         engineUrl,
@@ -137,7 +146,7 @@ $('login').addEventListener('submit', async (e) => {
         return;
     }
     $('password').value = '';
-    showMessage(`Connecté en tant que ${res.me.email}.`, true);
+    showMessage(t('login.loggedInAs', { email: res.me.email }), true);
     render();
 });
 
@@ -162,7 +171,7 @@ $('create').addEventListener('submit', async (e) => {
         render(); // file created but not submitted: the error message stays displayed
         return;
     }
-    showMessage(res.existed ? 'Ce document avait déjà un fichier.' : (file ? 'Fichier créé et rendu.' : 'Fichier créé.'), true);
+    showMessage(t(res.existed ? 'create.existed' : (file ? 'create.createdAndSubmitted' : 'create.created')), true);
     render();
 });
 
@@ -174,21 +183,23 @@ $('submit').addEventListener('click', async () => {
     const file = await submitTo(current.fileId, $('assignment').value);
     button.disabled = false;
     if (!file) return;
-    showMessage('Fichier rendu.', true);
+    showMessage(t('submit.done'), true);
     render();
 });
 
 async function upload(button, payload) {
     const busy = (on) => { button.disabled = on; button.classList.toggle('disabled', on); };
     busy(true);
-    showMessage('Envoi du document…', true);
+    showMessage(t('upload.sending'), true);
     const res = await chrome.runtime.sendMessage({ type: 'CERTIMENS_UPLOAD_DOCX', documentId: current.doc.id, ...payload });
     busy(false);
     if (!res.ok) {
-        showMessage(res.status === 0 || res.status === 413 || res.status === 404 ? `Envoi impossible : ${res.message}.` : errorText(res), false);
+        showMessage(res.status === 0 || res.status === 413 || res.status === 404
+            ? t('upload.failed', { message: res.message })
+            : errorText(res), false);
         return;
     }
-    showMessage('Document envoyé.', true);
+    showMessage(t('upload.done'), true);
     showUpload(res.file);
 }
 
@@ -198,8 +209,8 @@ async function upload(button, payload) {
 $('exportDocx').addEventListener('click', () => {
     chrome.permissions.request({ origins: GOOGLE_EXPORT_ORIGINS }).then((granted) => {
         if (granted) upload($('exportDocx'), {});
-        else showMessage("Autorisation refusée : l'extension ne peut pas lire l'export Google Docs.", false);
-    }, (err) => showMessage(`Autorisation impossible : ${err.message}`, false));
+        else showMessage(t('upload.exportDenied'), false);
+    }, (err) => showMessage(t('error.permissionFailed', { message: err.message }), false));
 });
 
 $('docxFile').addEventListener('change', async (e) => {
@@ -209,7 +220,7 @@ $('docxFile').addEventListener('change', async (e) => {
     const bytes = new Uint8Array(await file.arrayBuffer());
     // A .docx is a zip archive: "PK" signature.
     if (!file.name.toLowerCase().endsWith('.docx') || bytes[0] !== 0x50 || bytes[1] !== 0x4b) {
-        showMessage("Ce fichier n'est pas un document .docx.", false);
+        showMessage(t('upload.notDocx'), false);
         return;
     }
     let binary = '';
@@ -220,6 +231,13 @@ $('docxFile').addEventListener('change', async (e) => {
 $('logout').addEventListener('click', async () => {
     await chrome.runtime.sendMessage({ type: 'CERTIMENS_LOGOUT' });
     clearMessage();
+    render();
+});
+
+$('pause').addEventListener('click', async () => {
+    const res = await chrome.runtime.sendMessage({ type: 'CERTIMENS_SET_PAUSED', paused: !current.paused });
+    if (!res.ok) return showMessage(errorText(res), false);
+    showMessage(t(res.paused ? 'pause.paused' : 'pause.resumed'), !res.paused);
     render();
 });
 

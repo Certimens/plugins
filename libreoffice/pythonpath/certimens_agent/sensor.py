@@ -22,6 +22,7 @@ from com.sun.star.document import XDocumentEventListener
 from com.sun.star.frame import XDispatch, XDispatchProviderInterceptor
 
 from . import measure as m
+from .i18n import t
 
 DOCUMENT_ID_PROPERTY = 'CertimensDocumentId'
 VOLUME_REFRESH_S = 5
@@ -166,9 +167,8 @@ class DocumentSensor:
         self.prompted = True
         try:
             info = uno.getConstantByName('com.sun.star.frame.InfobarType.INFO')
-            controller.appendInfobar(INFOBAR_ID, 'Certimens',
-                                     "Ce document n'est pas encore associé à votre espace Certimens.",
-                                     info, (StringPair('Associer…', OPEN_COMMAND),), True)
+            controller.appendInfobar(INFOBAR_ID, 'Certimens', t('infobar.unlinked'),
+                                     info, (StringPair(t('infobar.link'), OPEN_COMMAND),), True)
         except Exception:
             pass  # LibreOffice too old
 
@@ -213,6 +213,8 @@ class DocumentSensor:
         self.idle_timer.start()
 
     def on_key(self, event):
+        if self.engine.paused():
+            return
         now = time.time()
         code = event.KeyCode
         # Auto-repeat: the key is held (no release seen yet) and keeps firing, or it comes
@@ -248,11 +250,15 @@ class DocumentSensor:
             state[1] = False
 
     def on_click(self):
+        if self.engine.paused():
+            return
         with self.lock:
             self.measure.on_click(time.time())
         self._arm_idle()
 
     def on_paste(self):
+        if self.engine.paused():
+            return
         text = clipboard_text(self.ctx)
         self.ensure_id()
         with self.lock:
@@ -262,6 +268,8 @@ class DocumentSensor:
     def on_deactivated(self):
         # Keys held while the focus leaves never deliver their release here.
         self.pressed.clear()
+        if self.engine.paused():
+            return
         # Just after deactivation, the active window is known: a LibreOffice dialog
         # does not count, another application (null active window) does.
         def check():

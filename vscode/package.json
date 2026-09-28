@@ -1,0 +1,117 @@
+{
+    "name": "certimens",
+    "displayName": "%extension.displayName%",
+    "description": "%extension.description%",
+    "version": "0.0.0",
+    "publisher": "certimens",
+    "license": "SEE LICENSE IN ../README.md",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Certimens/plugins.git",
+        "directory": "vscode"
+    },
+    "engines": {
+        "vscode": "^1.90.0"
+    },
+    "categories": [
+        "Education",
+        "Other"
+    ],
+    "keywords": [
+        "certimens",
+        "authorship",
+        "rédaction",
+        "intégrité"
+    ],
+    "icon": "media/icon128.png",
+    "main": "./extension.js",
+    "activationEvents": [
+        "onStartupFinished"
+    ],
+    "extensionKind": [
+        "ui",
+        "workspace"
+    ],
+    "capabilities": {
+        "untrustedWorkspaces": {
+            "supported": true,
+            "description": "%capability.untrustedWorkspaces%"
+        },
+        "virtualWorkspaces": {
+            "supported": false,
+            "description": "%capability.virtualWorkspaces%"
+        }
+    },
+    "contributes": {
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "certimens",
+                    "title": "%view.title%",
+                    "icon": "media/shield.svg"
+                }
+            ]
+        },
+        "views": {
+            "certimens": [
+                {
+                    "type": "webview",
+                    "id": "certimens.panel",
+                    "name": "%view.name%"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "certimens.login",
+                "title": "%command.login%"
+            },
+            {
+                "command": "certimens.logout",
+                "title": "%command.logout%"
+            },
+            {
+                "command": "certimens.submit",
+                "title": "%command.submit%"
+            },
+            {
+                "command": "certimens.togglePause",
+                "title": "%command.togglePause%"
+            },
+            {
+                "command": "certimens.flush",
+                "title": "%command.flush%"
+            },
+            {
+                "command": "certimens.focusPanel",
+                "title": "%command.focusPanel%"
+            }
+        ],
+        "configuration": {
+            "title": "%configuration.title%",
+            "properties": {
+                "certimens.exclude": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [
+                        "**/node_modules/**",
+                        "**/.git/**",
+                        "**/dist/**",
+                        "**/build/**",
+                        "**/out/**",
+                        "**/target/**",
+                        "**/vendor/**",
+                        "**/.venv/**",
+                        "**/__pycache__/**",
+                        "**/*.min.*",
+                        "**/*.lock",
+                        "**/*-lock.json"
+                    ],
+                    "markdownDescription": "%configuration.exclude%"
+                }
+            }
+        }
+    }
+}

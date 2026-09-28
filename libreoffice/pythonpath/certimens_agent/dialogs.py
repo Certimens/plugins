@@ -24,6 +24,7 @@ import uno
 import unohelper
 from com.sun.star.awt import XActionListener
 
+from .i18n import t
 from .engine import DEFAULT_ENGINE_URL, HttpError
 
 # Writer's Word filter — what "Enregistrer sous… .docx" uses.
@@ -42,25 +43,26 @@ def prop(name, value):
 def error_text(err):
     """What a failed call says, in the wording of the browser extension."""
     if err.status == 401:
-        return 'Identifiants incorrects ou accès révoqué — reconnectez-vous.'
+        return t('error.credentials')
     if err.status == 0:
-        return 'Moteur injoignable (%s).' % (err.message or 'erreur réseau')
-    message = err.message or 'erreur inconnue'
+        return t('error.engineUnreachable', message=err.message or t('error.networkError'))
+    message = err.message or t('error.unknown')
     return message[:1].upper() + message[1:] + '.'
 
 
 def deadline_label(assignment):
     """« Mémoire (avant le 12/05) », the deadline flagged as overdue like in the popup."""
+    title = assignment.get('title') or t('assignment.fallbackTitle')
     raw = (assignment.get('deadline') or '').replace('Z', '+00:00')
     try:
         deadline = datetime.fromisoformat(raw)
     except ValueError:
-        return assignment.get('title') or 'Devoir'
+        return title
     if deadline.tzinfo is None:
         deadline = deadline.replace(tzinfo=timezone.utc)
     passed = deadline < datetime.now(timezone.utc)
-    return '%s (%s %s)' % (assignment.get('title') or 'Devoir', 'échu le' if passed else 'avant le',
-                           deadline.astimezone().strftime('%d/%m'))
+    date = deadline.astimezone().strftime(t('assignment.dateFormat'))
+    return t('assignment.overdue' if passed else 'assignment.due', title=title, date=date)
 
 
 def export_docx(doc):
@@ -82,8 +84,8 @@ def export_docx(doc):
 def pick_docx(ctx):
     """Bytes of a .docx chosen by the student, or None if the file window was cancelled."""
     picker = ctx.ServiceManager.createInstanceWithContext('com.sun.star.ui.dialogs.FilePicker', ctx)
-    picker.setTitle('Choisir le document .docx à envoyer')
-    picker.appendFilter('Document Word (.docx)', '*.docx')
+    picker.setTitle(t('upload.pickTitle'))
+    picker.appendFilter(t('upload.pickFilter'), '*.docx')
     try:
         if not picker.execute():
             return None
@@ -100,7 +102,7 @@ def pick_docx(ctx):
         data = f.read()
     # A .docx is a zip archive: "PK" signature, as the popup checks it.
     if not path.lower().endswith('.docx') or data[:2] != b'PK':
-        raise HttpError(0, "ce fichier n'est pas un document .docx")
+        raise HttpError(0, t('upload.notDocxReason'))
     return data
 
 
@@ -269,23 +271,23 @@ class LoginWindow(Window):
     """Student login (the popup's login form)."""
 
     def __init__(self, ctx, parent, engine):
-        super().__init__(ctx, parent, 'Certimens — Connexion')
+        super().__init__(ctx, parent, t('window.login'))
         self.engine = engine
         config = engine.config()
-        self.text('intro', 'Connectez-vous à votre espace Certimens.', lines=1)
+        self.text('intro', t('login.intro'), lines=1)
         self.gap()
-        self.field('email', 'E-mail', config.get('email', ''))
-        self.field('password', 'Mot de passe', password=True)
-        self.field('engineUrl', 'Adresse du moteur', config.get('engineUrl') or DEFAULT_ENGINE_URL)
+        self.field('email', t('login.email'), config.get('email', ''))
+        self.field('password', t('login.password'), password=True)
+        self.field('engineUrl', t('login.engineUrl'), config.get('engineUrl') or DEFAULT_ENGINE_URL)
         self.gap()
-        self.button('login', 'Se connecter', self.login, default=True)
+        self.button('login', t('login.submit'), self.login, default=True)
         self.button('cancel', 'Fermer', self.close, blocking=False)
 
     def login(self):
         email, password = self.value('email'), self.model.getByName('password').getPropertyValue('Text')
         engine_url = self.value('engineUrl') or DEFAULT_ENGINE_URL
         if not email or not password:
-            self.message('Renseignez votre e-mail et votre mot de passe.')
+            self.message(t('login.missing'))
             return
 
         def done(me, error):
@@ -315,45 +317,64 @@ class DocumentWindow(Window):
         self.file = None
         self.assignments = []
 
-        self.text('who', 'Connecté : %s' % (self.engine.config().get('email') or ''), height=9)
+        self.text('who', t('account.connectedAs', email=self.engine.config().get('email') or ''), height=9)
         self.line()
         if self.file_id:
             self._linked_controls()
         else:
             self._create_controls()
         self.line()
-        self.button('logout', 'Se déconnecter', self.logout)
-        self.button('close', 'Fermer', self.close, default=True, blocking=False)
+        self.button('pause', self._pause_label(), self.toggle_pause)
+        self.button('logout', t('account.logout'), self.logout)
+        self.button('close', t('common.close'), self.close, default=True, blocking=False)
 
     def _create_controls(self):
-        self.text('docLabel', "Ce document n'a pas encore de fichier Certimens.", lines=1)
+        self.text('docLabel', t('doc.unlinked'), lines=1)
         self.gap()
-        self.field('name', 'Nom du fichier', self.sensor.name)
-        self.choice('assignment', 'Devoir')
+        self.field('name', t('doc.name'), self.sensor.name)
+        self.choice('assignment', t('assignment.fallbackTitle'))
         self.gap()
-        self.button('create', 'Créer le fichier', self.create)
+        self.button('create', t('doc.create'), self.create)
 
     def _linked_controls(self):
         self.text('name', self.sensor.name, bold=True)
-        self.text('linked', 'Fichier Certimens associé : les mesures y sont envoyées.', lines=1)
+        self.text('linked', t('doc.linked'), lines=1)
         self.text('submitted', '', height=9)
         self.gap()
-        self.choice('assignment', 'Devoir')
-        self.button('submit', 'Rendre sur ce devoir', self.submit)
+        self.choice('assignment', t('assignment.fallbackTitle'))
+        self.button('submit', t('doc.submit'), self.submit)
         self.gap()
-        self.button('upload', 'Envoyer le document', self.upload)
+        self.button('upload', t('upload.send'), self.upload)
         # Shown only where Writer's export is refused: the student picks the .docx himself.
-        self.button('pick', 'Choisir un fichier .docx…', self.pick)
+        self.button('pick', t('upload.pick'), self.pick)
         self.text('uploadHint', '', height=9, lines=2)
         self.gap()
-        self.button('open', 'Ouvrir dans Certimens', self.open_in_browser)
+        self.button('open', t('doc.openInCertimens'), self.open_in_browser)
 
     def ready(self):
         if self.file_id:
             self.show('pick', False)
         if self.note:
             self.message(self.note)
+        elif self.engine.paused():
+            self.message(t('pause.paused'))
         self.load()
+
+    # --- suspending the measurement ---
+    # The pause covers every document open in this LibreOffice, because it is the student who
+    # pauses, not one document: the engine holds it, and every sensor reads it.
+    def _pause_label(self):
+        return t('pause.resume' if self.engine.paused() else 'pause.suspend')
+
+    def toggle_pause(self):
+        paused = not self.engine.paused()
+        # The window in progress is closed before the pause: nothing measured is lost, and
+        # nothing keeps accumulating behind a suspended sensor.
+        if paused:
+            self.sensor.flush('pause')
+        self.engine.set_paused(paused)
+        self.label('pause', self._pause_label())
+        self.message(t('pause.paused' if paused else 'pause.resumed'))
 
     # --- loading ---
     def load(self):
@@ -372,7 +393,7 @@ class DocumentWindow(Window):
                 self.show_file(file)
             elif self.file_id:
                 # the file was deleted on the engine side: the window reopens on creation
-                self.message("Le fichier Certimens de ce document n'existe plus : recréez-le.")
+                self.message(t('doc.gone'))
                 self.close('reopen')
 
         self.call(work, done, busy='Chargement…')
@@ -380,7 +401,7 @@ class DocumentWindow(Window):
     def fill_assignments(self):
         control = self.control('assignment')
         control.removeItems(0, control.getItemCount())
-        first = '— Choisir un devoir —' if self.assignments else "— Aucun devoir pour l'instant —"
+        first = t('assignment.choose' if self.assignments else 'assignment.none')
         control.addItems(tuple([first] + [deadline_label(a) for a in self.assignments]), 0)
         current = (self.file or {}).get('assignment_id')
         position = next((i + 1 for i, a in enumerate(self.assignments) if a['id'] == current), 0)
@@ -390,11 +411,10 @@ class DocumentWindow(Window):
         self.file = file
         self.file_id = file['id']
         self.label('name', file.get('document_name') or self.sensor.name)
-        self.label('submitted', ('Rendu sur : %s' % file['assignment_title'])
-                   if file.get('assignment_title') else 'Pas encore rendu sur un devoir.')
-        self.label('uploadHint', 'Un document est déjà envoyé : un nouvel envoi le remplace.'
-                   if file.get('content_type') else '')
-        self.label('submit', 'Changer de devoir' if file.get('assignment_id') else 'Rendre sur ce devoir')
+        self.label('submitted', t('doc.submittedTo', title=file['assignment_title'])
+                   if file.get('assignment_title') else t('doc.notSubmitted'))
+        self.label('uploadHint', t('doc.alreadyUploaded') if file.get('content_type') else '')
+        self.label('submit', t('doc.changeAssignment' if file.get('assignment_id') else 'doc.submit'))
 
     def chosen_assignment(self):
         position = self.control('assignment').getSelectedItemPos()
@@ -420,25 +440,25 @@ class DocumentWindow(Window):
             self.sensor.clear_infobar()
             if file:
                 self.file_id = file['id']
-            self.close(('reopen', 'Ce document avait déjà un fichier.' if existed else 'Fichier créé.'))
+            self.close(('reopen', t('create.existed' if existed else 'create.created')))
 
-        self.call(work, done, busy='Création du fichier…')
+        self.call(work, done, busy=t('doc.creating'))
 
     def submit(self):
         assignment_id = self.chosen_assignment()
         if not assignment_id:
-            self.message('Choisissez un devoir.')
+            self.message(t('assignment.required'))
             return
 
         def done(file, error):
             if error:
-                self.message(('Rendu impossible : %s.' % error.message) if error.status == 403
+                self.message(t('submit.refused', message=error.message) if error.status == 403
                              else error_text(error))
                 return
             self.show_file({**(self.file or {}), **file})
-            self.message('Fichier rendu.')
+            self.message(t('submit.done'))
 
-        self.call(lambda: self.engine.submit(self.file_id, assignment_id), done, busy='Rendu en cours…')
+        self.call(lambda: self.engine.submit(self.file_id, assignment_id), done, busy=t('submit.busy'))
 
     def upload(self):
         """One click: Writer exports the open document, and it goes to the engine."""
@@ -447,8 +467,7 @@ class DocumentWindow(Window):
         except Exception as err:
             # Export refused: the student sends a .docx saved by hand instead.
             self.show('pick', True)
-            self.message('Export automatique impossible (%s). Enregistrez le document en .docx, '
-                         'puis choisissez-le ci-dessous.' % err)
+            self.message(t('upload.exportFailed', message=err))
             return
         self.send(document)
 
@@ -463,7 +482,7 @@ class DocumentWindow(Window):
                 self.message(error_text(error))
                 return
             self.show_file({**(self.file or {}), **file})
-            self.message('Document envoyé (%d Ko).' % (len(document) // 1024))
+            self.message(t('upload.doneWithSize', size=len(document) // 1024))
 
         self.call(lambda: self.engine.upload_docx(self.doc_id, document), done, busy='Envoi du document…')
 
@@ -473,7 +492,7 @@ class DocumentWindow(Window):
         shell.execute(url, '', URIS_ONLY)
 
     def logout(self):
-        self.call(self.engine.logout, lambda result, error: self.close('logged-out'), busy='Déconnexion…')
+        self.call(self.engine.logout, lambda result, error: self.close('logged-out'), busy=t('account.loggingOut'))
 
 
 def open_window(ctx, agent, doc):

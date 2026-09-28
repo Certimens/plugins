@@ -14,8 +14,15 @@
   <Version>{{VERSION}}</Version>
   <ProviderName>Certimens</ProviderName>
   <DefaultLocale>fr-FR</DefaultLocale>
-  <DisplayName DefaultValue="Certimens — Agent de rédaction"/>
-  <Description DefaultValue="Mesure la rédaction dans Word et envoie les compteurs au moteur Certimens. Aucun texte n'est enregistré."/>
+  <!-- Office picks the override matching the user's Office display language, and falls back to
+       DefaultLocale otherwise: the fiche and the ribbon follow Word, while the task pane follows
+       the Certimens account (see word/taskpane.js). -->
+  <DisplayName DefaultValue="Certimens — Agent de rédaction">
+    <Override Locale="en-us" Value="Certimens — Writing Agent"/>
+  </DisplayName>
+  <Description DefaultValue="Mesure la rédaction dans Word et envoie les compteurs au moteur Certimens. Aucun texte n'est enregistré.">
+    <Override Locale="en-us" Value="Measures how you write in Word and sends counters to the Certimens engine. No text is ever recorded."/>
+  </Description>
   <IconUrl DefaultValue="{{BASE_URL}}/icons/icon32.png"/>
   <HighResolutionIconUrl DefaultValue="{{BASE_URL}}/icons/icon64.png"/>
   <SupportUrl DefaultValue="https://certimens.fr"/>
@@ -92,13 +99,19 @@
         <bt:Url id="Support.Url" DefaultValue="https://certimens.fr"/>
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="GetStarted.Title" DefaultValue="Certimens est prêt"/>
+        <bt:String id="GetStarted.Title" DefaultValue="Certimens est prêt">
+          <bt:Override Locale="en-us" Value="Certimens is ready"/>
+        </bt:String>
         <bt:String id="Group.Label" DefaultValue="Certimens"/>
         <bt:String id="Button.Label" DefaultValue="Certimens"/>
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="GetStarted.Description" DefaultValue="Ouvrez Certimens depuis l'onglet Accueil pour vous connecter et associer ce document à votre espace."/>
-        <bt:String id="Button.Tooltip" DefaultValue="Connexion à Certimens, fichier du document et rendu sur un devoir."/>
+        <bt:String id="GetStarted.Description" DefaultValue="Ouvrez Certimens depuis l'onglet Accueil pour vous connecter et associer ce document à votre espace.">
+          <bt:Override Locale="en-us" Value="Open Certimens from the Home tab to log in and link this document to your space."/>
+        </bt:String>
+        <bt:String id="Button.Tooltip" DefaultValue="Connexion à Certimens, fichier du document et rendu sur un devoir.">
+          <bt:Override Locale="en-us" Value="Log in to Certimens, the document's file, and submitting to an assignment."/>
+        </bt:String>
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>

@@ -68,3 +68,18 @@ Les tests sont en `unittest` (stdlib) et jouent des scénarios de frappe horodat
 Le `.oxt` est joint à chaque release GitHub, puis **déposé à la main** sur
 extensions.libreoffice.org : le site n'a pas d'API. Sous Linux, le paquet
 `libreoffice-script-provider-python` de la distribution est nécessaire.
+
+## Mesure suspendue
+
+L'état vit dans `Engine.paused()` (donc dans `certimens.json`, partagé par tous les documents de
+la session) et chaque `DocumentSensor` le consulte en tête de `on_key`, `on_click`, `on_paste` et
+`on_deactivated`. Le bouton est dans la fenêtre **Certimens** (`dialogs.py`), qui vide la fenêtre
+de mesure du document courant avant de suspendre. La règle commune est dans `mesures-redaction`.
+
+## Langues
+
+`pythonpath/certimens_agent/i18n.py` porte les textes des fenêtres et de la barre d'information ;
+`description.xml` et `description/description-{fr,en}.txt` ceux du gestionnaire d'extensions. La
+langue est choisie au démarrage de l'agent (`agent.py`) : celle du compte si l'étudiant est déjà
+connecté, sinon `ooLocale` de LibreOffice. Les libellés du menu (`Addons.xcu`) n'ont rien à
+traduire, ce sont des noms de marque. Règle complète : skill `langues-interface`.
