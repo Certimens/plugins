@@ -19,6 +19,15 @@
     <div class="brand">
         <img class="mark" src="icons/icon128.png" alt="">
         <h1>Certi<span class="mens">mens</span></h1>
+        <div id="actions" class="icon-actions" hidden>
+            <button type="button" id="pause" class="icon-btn" aria-pressed="false">
+                <svg id="iconPause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9.5 5v14M14.5 5v14"/></svg>
+                <svg id="iconPlay" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true" hidden><path d="M8 5.5l11 6.5-11 6.5z"/></svg>
+            </button>
+            <button type="button" id="logout" class="icon-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9"/><path d="M17.5 8.5 21 12l-3.5 3.5"/><path d="M21 12H10"/></svg>
+            </button>
+        </div>
     </div>
 
     <form id="login" class="card stack" hidden>
@@ -39,10 +48,10 @@
     </form>
 
     <div id="account" class="stack" style="gap: 12px" hidden>
-        <div class="row small">
+        <div class="small">
             <span class="muted"><span data-i18n="account.connected"></span> <strong id="who" style="color: var(--text)"></strong></span>
-            <button type="button" id="logout" class="link small" data-i18n="account.logout"></button>
         </div>
+        <div id="pausedAlert" class="alert error small" hidden data-i18n="pause.alert"></div>
 
         <div class="card stack">
             <div class="muted small" data-i18n="doc.open"></div>
@@ -72,9 +81,6 @@
     </div>
 
     <div id="message" class="alert small"></div>
-
-    <div id="pausedAlert" class="alert error small" hidden data-i18n="pause.alert"></div>
-    <button type="button" id="pause" class="btn outlined block" hidden></button>
 
     <div id="sync" class="muted small"></div>
     <div id="webNote" class="muted small" hidden data-i18n="word.webNote"></div>

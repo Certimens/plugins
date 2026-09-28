@@ -71,6 +71,18 @@ Les quatre agents ont un bouton qui **suspend la mesure**. Quatre règles, ident
 
 L'état est **global à l'agent**, pas par document : c'est l'étudiant qui suspend, pas un fichier.
 
+**Le contrôle est une icône, dans l'en-tête.** Les trois agents à interface HTML (popup, volet
+Word, panneau VS Code) portent la suspension et la déconnexion en haut à droite, en icônes
+seules&nbsp;: une popup n'a pas la largeur pour deux boutons pleins. Une icône ne nomme rien, donc
+chacune porte son action en `aria-label` et, en `title`, la phrase qui dit ce que presser
+déclenche&nbsp;; la suspension est un basculement, d'où `aria-pressed`. Sa couleur ne fait que
+**seconder** le bandeau — l'état ne doit jamais tenir à la seule icône. La fenêtre LibreOffice n'a
+pas d'icônes (dialogue UNO) mais a la même aide au survol, par `HelpText`.
+
+Piège rencontré&nbsp;: un élément **SVG n'a pas la propriété `hidden`** (elle vit sur
+`HTMLElement`). L'affecter en JavaScript ne crée qu'une propriété morte et l'icône ne bascule
+jamais&nbsp;: il faut poser l'attribut, et une règle de `ui.css` agit dessus.
+
 **Il s'affiche une fois, pas deux.** Le bandeau permanent porte l'état ; le message transitoire ne
 confirme que la **reprise**, qui ne laisse rien à l'écran. Les deux ensemble donnaient deux blocs
 rouges l'un sous l'autre, disant la même chose en deux formulations — c'était

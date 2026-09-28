@@ -108,6 +108,15 @@ class CertimensPanel {
     <div class="brand">
         <img class="mark" src="${this.media('icon128.png')}" alt="">
         <h1>Certi<span class="mens">mens</span></h1>
+        <div id="actions" class="icon-actions" hidden>
+            <button type="button" id="pause" class="icon-btn" aria-pressed="false">
+                <svg id="iconPause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9.5 5v14M14.5 5v14"/></svg>
+                <svg id="iconPlay" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true" hidden><path d="M8 5.5l11 6.5-11 6.5z"/></svg>
+            </button>
+            <button type="button" id="logout" class="icon-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9"/><path d="M17.5 8.5 21 12l-3.5 3.5"/><path d="M21 12H10"/></svg>
+            </button>
+        </div>
     </div>
 
     <form id="login" class="card stack" hidden>
@@ -128,10 +137,10 @@ class CertimensPanel {
     </form>
 
     <div id="account" class="stack" style="gap: 12px" hidden>
-        <div class="row small">
+        <div class="small">
             <span class="muted">${esc(t('account.connected'))} <strong id="who" style="color: var(--text)"></strong></span>
-            <button type="button" id="logout" class="link small">${esc(t('account.logout'))}</button>
         </div>
+        <div id="pausedAlert" class="alert error small" hidden>${esc(t('panel.pausedAlert'))}</div>
 
         <div id="doc" class="card stack" hidden>
             <div class="muted small">${esc(t('panel.openFile'))}</div>
@@ -143,10 +152,8 @@ class CertimensPanel {
         <div id="noDoc" class="card muted small" hidden>${esc(t('panel.noFile'))}</div>
 
         <div class="card stack" style="gap: 8px">
-            <div id="pausedAlert" class="alert error small" hidden>${esc(t('panel.pausedAlert'))}</div>
             <div id="measuring" class="muted small">${esc(t('panel.measured'))}</div>
             <div id="files" class="files small"></div>
-            <button type="button" id="pause" class="btn outlined block"></button>
         </div>
     </div>
 
@@ -156,6 +163,7 @@ class CertimensPanel {
         const vscode = acquireVsCodeApi();
         const $ = (id) => document.getElementById(id);
         const show = (id, on) => { $(id).hidden = !on; };
+        const showIcon = (svg, on) => (on ? svg.removeAttribute('hidden') : svg.setAttribute('hidden', ''));
 
         $('login').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -189,7 +197,21 @@ class CertimensPanel {
 
             show('pausedAlert', state.paused);
             show('measuring', !state.paused);
-            $('pause').textContent = state.paused ? state.labels.resume : state.labels.suspend;
+            show('actions', state.connected);
+
+            // Une icône ne nomme rien : chaque bouton porte son action comme nom accessible, et
+            // la phrase qui dit ce qu'il déclenche en infobulle.
+            const pause = $('pause');
+            pause.setAttribute('aria-pressed', String(!!state.paused));
+            pause.setAttribute('aria-label', state.paused ? state.labels.resume : state.labels.suspend);
+            pause.title = state.paused ? state.labels.resumeTip : state.labels.suspendTip;
+            // Un élément SVG n'a pas la propriété hidden (elle est sur HTMLElement) : il faut
+            // poser l'attribut, sinon l'icône ne bascule jamais. Pas d'accent grave ici : tout
+            // ce bloc vit dans le gabarit qui construit la page.
+            showIcon($('iconPause'), !state.paused);
+            showIcon($('iconPlay'), !!state.paused);
+            $('logout').setAttribute('aria-label', state.labels.logout);
+            $('logout').title = state.labels.logoutTip;
 
             $('files').textContent = '';
             for (const name of state.files) {
@@ -228,6 +250,10 @@ class CertimensPanel {
                 labels: {
                     suspend: t('pause.suspend'),
                     resume: t('pause.resume'),
+                    suspendTip: t('pause.suspendTip'),
+                    resumeTip: t('pause.resumeTip'),
+                    logout: t('account.logout'),
+                    logoutTip: t('account.logoutTip'),
                     noneMeasured: t('panel.measuredNone'),
                 },
                 status: statusText(status, queue.length, this.agent.paused()),

@@ -25,6 +25,7 @@ MESSAGES = {
         'login.busy': 'Connexion…',
         'account.connectedAs': 'Connecté : {email}',
         'account.logout': 'Se déconnecter',
+        'account.logoutTip': 'Se déconnecter — le jeton d’accès est révoqué sur le moteur ; la mesure s’arrête jusqu’à la prochaine connexion.',
         'account.loggingOut': 'Déconnexion…',
         'common.close': 'Fermer',
 
@@ -71,6 +72,8 @@ MESSAGES = {
         'upload.doneWithSize': 'Document envoyé ({size} Ko).',
 
         'pause.suspend': 'Suspendre la mesure',
+        'pause.suspendTip': 'Suspendre la mesure — plus rien n’est compté jusqu’à ce que vous la repreniez, même après un redémarrage.',
+        'pause.resumeTip': 'Reprendre la mesure — les fenêtres de mesure repartent aussitôt.',
         'pause.resume': 'Reprendre la mesure',
         'pause.paused': ('Mesure suspendue. Elle le reste jusqu’à ce que vous la repreniez, '
                          'même après un redémarrage.'),
@@ -92,6 +95,7 @@ MESSAGES = {
         'login.busy': 'Logging in…',
         'account.connectedAs': 'Logged in: {email}',
         'account.logout': 'Log out',
+        'account.logoutTip': 'Log out — the access token is revoked on the engine; measurement stops until you log in again.',
         'account.loggingOut': 'Logging out…',
         'common.close': 'Close',
 
@@ -138,6 +142,8 @@ MESSAGES = {
         'upload.doneWithSize': 'Document sent ({size} KB).',
 
         'pause.suspend': 'Pause measurement',
+        'pause.suspendTip': 'Pause measurement — nothing is counted until you resume it, even after a restart.',
+        'pause.resumeTip': 'Resume measurement — measurement windows start again straight away.',
         'pause.resume': 'Resume measurement',
         'pause.paused': ('Measurement paused. It stays paused until you resume it, '
                          'even after a restart.'),

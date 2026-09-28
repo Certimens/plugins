@@ -13,6 +13,33 @@ function startLanguage(config) {
 
 const $ = (id) => document.getElementById(id);
 
+// An SVG element does not implement the `hidden` property — it lives on HTMLElement — so setting
+// it in JavaScript only creates a dead expando and the icon never swaps. The attribute has to be
+// written by hand; the stylesheet acts on it.
+function showIcon(svg, visible) {
+    if (visible) svg.removeAttribute('hidden');
+    else svg.setAttribute('hidden', '');
+}
+
+// The header's icon actions, shared by the popup and the Word task pane.
+//
+// An icon names nothing on its own: each button carries its action as an accessible name, and the
+// sentence that says what pressing it does as a tooltip. The pause is a toggle, so it also
+// carries aria-pressed — and its colour only ever seconds the banner, which keeps saying in plain
+// words that the measurement is suspended.
+function renderIconActions(paused) {
+    $('actions').hidden = false;
+    const pause = $('pause');
+    pause.setAttribute('aria-pressed', String(!!paused));
+    pause.setAttribute('aria-label', t(paused ? 'pause.resume' : 'pause.suspend'));
+    pause.title = t(paused ? 'pause.resumeTip' : 'pause.suspendTip');
+    showIcon($('iconPause'), !paused);
+    showIcon($('iconPlay'), !!paused);
+    const logout = $('logout');
+    logout.setAttribute('aria-label', t('account.logout'));
+    logout.title = t('account.logoutTip');
+}
+
 // Displays a message in the #message element (its other classes are kept).
 function showMessage(text, ok) {
     const el = $('message');

@@ -354,6 +354,13 @@ Le comportement est le même partout :
 
 La suspension est **globale à l'agent**, pas par document : c'est l'étudiant qui suspend.
 
+La suspension et la déconnexion sont deux **icônes en haut à droite** de la popup, du volet Word
+et du panneau VS Code — une popup n'a pas la largeur pour deux boutons pleins. Chacune porte son
+action en `aria-label` et, au survol, la phrase qui dit ce qu'elle déclenche ; la suspension
+ajoute `aria-pressed` et vire au rouge, sans jamais être le seul indice de l'état. La fenêtre
+LibreOffice garde ses boutons texte — un dialogue UNO n'a pas d'icônes — avec la même aide au
+survol (`HelpText`).
+
 L'état s'affiche **une fois** : le bandeau permanent le porte, et le message transitoire ne
 confirme que la reprise — elle, ne laisse rien à l'écran. Dans le panneau VS Code, la ligne d'état
 ne parle pendant une pause que s'il reste des mesures d'avant à envoyer.
