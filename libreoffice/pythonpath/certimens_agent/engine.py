@@ -1,7 +1,7 @@
 """Sending to the Certimens engine (the equivalent of extension/background.js), without LibreOffice.
 
-Each document is tied to an engine file (created on the first send via POST /api/files,
-then remembered). Metrics go out to POST /api/files/:id/metrics, authenticating as the
+Each document is tied to an engine document (created on the first send via POST /api/documents,
+then remembered). Metrics go out to POST /api/documents/:id/metrics, authenticating as the
 student with an API token (Bearer) that is created at login and kept in place of the
 password. When offline, they stay in a queue (a JSON file in the LibreOffice
 profile) that is retried every minute. Sending happens on a dedicated thread: the LibreOffice
@@ -60,7 +60,7 @@ class Engine:
 
     # --- 1. STORAGE ---
     def _load(self):
-        state = {'config': {}, 'files': {}, 'titles': {}, 'syncedTitles': {}, 'queue': [],
+        state = {'config': {}, 'engineIds': {}, 'titles': {}, 'syncedTitles': {}, 'queue': [],
                  'status': {'state': 'idle'}, 'extendedUnsupported': False, 'paused': False}
         try:
             with open(self.path, encoding='utf-8') as f:
@@ -115,9 +115,9 @@ class Engine:
         for listener in list(self.listeners):
             listener()
 
-    def file_id(self, document_id):
+    def engine_id(self, document_id):
         with self.lock:
-            return self.state['files'].get(document_id)
+            return self.state['engineIds'].get(document_id)
 
     def _set_status(self, status):
         with self.lock:
@@ -198,37 +198,37 @@ class Engine:
                                     'language': config.get('language', '')}
         self._set_status({'state': 'unconfigured'})
 
-    def _ensure_file(self, config, document_id, document_name, editor_title=None):
-        """Creates the document's engine file if needed. editor_title is the document's name in
+    def _ensure_document(self, config, document_id, document_name, editor_title=None):
+        """Creates the document's engine document if needed. editor_title is the document's name in
         LibreOffice at that moment: it serves as the baseline for detecting a later rename."""
         with self.create_lock:
-            existing = self.file_id(document_id)
+            existing = self.engine_id(document_id)
             if existing:
                 return existing
-            file = self.api('POST', '/api/files', {'document_name': document_name}, config)
+            file = self.api('POST', '/api/documents', {'name': document_name}, config)
             with self.lock:
-                self.state['files'][document_id] = file['id']
+                self.state['engineIds'][document_id] = file['id']
                 self.state['syncedTitles'][document_id] = editor_title or document_name
                 self._save()
             return file['id']
 
     def create_file(self, document_id, name, editor_title):
         """Explicit creation (Certimens window); no effect if the file already exists."""
-        existed = bool(self.file_id(document_id))
-        return self._ensure_file(self.config(), document_id, name, editor_title), existed
+        existed = bool(self.engine_id(document_id))
+        return self._ensure_document(self.config(), document_id, name, editor_title), existed
 
     def doc_info(self, document_id):
         """Engine file linked to a document (None if not yet created or deleted)."""
-        file_id = self.file_id(document_id)
-        if not file_id:
+        engine_id = self.engine_id(document_id)
+        if not engine_id:
             return None
         try:
-            return self.api('GET', f'/api/files/{file_id}')
+            return self.api('GET', f'/api/documents/{engine_id}')
         except HttpError as err:
             if err.status != 404:
                 raise
             with self.lock:
-                self.state['files'].pop(document_id, None)
+                self.state['engineIds'].pop(document_id, None)
                 self._save()
             return None
 
@@ -239,22 +239,22 @@ class Engine:
             return []
         return sorted(self.api('GET', '/api/assignments') or [], key=lambda a: a['deadline'])
 
-    def submit(self, file_id, assignment_id):
+    def submit(self, engine_id, assignment_id):
         """The engine silently ignores an assignment the student is not attached to."""
-        file = self.api('PUT', f'/api/files/{file_id}', {'assignment_id': assignment_id})
+        file = self.api('PUT', f'/api/documents/{engine_id}', {'assignment_id': assignment_id})
         if file.get('assignment_id') != assignment_id:
             raise HttpError(403, "vous n'êtes pas rattaché à ce devoir")
         return file
 
     def upload_docx(self, document_id, docx_bytes):
-        """Sends the .docx to the engine file (replaces the document already sent)."""
-        file_id = self.file_id(document_id)
-        if not file_id:
-            raise HttpError(404, "créez d'abord le fichier Certimens")
+        """Sends the .docx to the engine document (replaces the document already sent)."""
+        engine_id = self.engine_id(document_id)
+        if not engine_id:
+            raise HttpError(404, "créez d'abord le document Certimens")
         document = base64.b64encode(docx_bytes).decode('ascii')
         if len(document) > MAX_UPLOAD_BASE64:
             raise HttpError(413, 'document trop volumineux (18 Mo maximum)')
-        return self.api('PUT', f'/api/files/{file_id}', {'document': document})
+        return self.api('PUT', f'/api/documents/{engine_id}', {'document': document})
 
     def note_title(self, document_id, title):
         with self.lock:
@@ -280,18 +280,18 @@ class Engine:
 
     def _push(self, config, item):
         for _ in range(3):
-            file_id = self._ensure_file(config, item['documentId'], item['documentName'])
+            engine_id = self._ensure_document(config, item['documentId'], item['documentName'])
             drop = self.state['extendedUnsupported']
             metrics = [{'type': t, 'value': v, 'period': item['period']}
                        for t, v in item['values'].items() if not (drop and t in EXTENDED_TYPES)]
             try:
-                self.api('POST', f'/api/files/{file_id}/metrics', {'metrics': metrics}, config)
+                self.api('POST', f'/api/documents/{engine_id}/metrics', {'metrics': metrics}, config)
                 return
             except HttpError as err:
                 if err.status == 404:
                     # file deleted on the engine side: we recreate one for this document
                     with self.lock:
-                        self.state['files'].pop(item['documentId'], None)
+                        self.state['engineIds'].pop(item['documentId'], None)
                         self._save()
                 elif err.status == 400 and err.code == 'metric_type_unknown' and not drop:
                     # Only this code means the engine predates the extended metrics; any other
@@ -305,11 +305,11 @@ class Engine:
     def _sync_titles(self, config):
         """Propagates renamed documents (saved under a different name) to the engine."""
         with self.lock:
-            pending = [(d, t, self.state['files'][d]) for d, t in self.state['titles'].items()
-                       if d in self.state['files'] and self.state['syncedTitles'].get(d) != t]
-        for document_id, title, file_id in pending:
+            pending = [(d, t, self.state['engineIds'][d]) for d, t in self.state['titles'].items()
+                       if d in self.state['engineIds'] and self.state['syncedTitles'].get(d) != t]
+        for document_id, title, engine_id in pending:
             try:
-                self.api('PUT', f'/api/files/{file_id}', {'document_name': title}, config)
+                self.api('PUT', f'/api/documents/{engine_id}', {'name': title}, config)
             except HttpError as err:
                 if err.status != 404:  # 404: file deleted, recreated on the next send
                     raise

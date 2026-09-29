@@ -21,9 +21,9 @@ le manifest ne contient que des URL. Conséquences :
 - Publier un correctif ne demande ni release ni tag : `gh workflow run pages.yml --ref ma-branche`
   republie le site. C'est **la production** qui est remplacée ; pour un essai sans conséquence,
   `npm run word:serve` + `dist/word-localhost.xml`.
-- Le moteur autorise cette origine en CORS sur `/api` : `wordAddinOrigins` dans
-  `internal/api/server.go` du dépôt moteur (`https://certimens.github.io` et
-  `https://localhost:3000`). Changer d'hébergement impose un changement côté moteur.
+- Le moteur autorise cette origine en CORS sur `/api` (`https://certimens.github.io`, plus
+  `https://localhost:3000` en développement) ; la liste est tenue côté moteur. Changer
+  d'hébergement impose donc un changement là-bas, à demander avant de publier.
 
 ## Runtime partagé
 

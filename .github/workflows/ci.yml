@@ -91,11 +91,11 @@ jobs:
           - **Firefox** : \`certimens-firefox\` → \`about:debugging#/runtime/this-firefox\` →
             *Charger un module complémentaire temporaire* → \`manifest.json\` du dossier dézippé
             (retiré à la fermeture de Firefox).
-          - **Safari** : \`safari-xcode\` (job macOS) → ouvrir le projet dans Xcode, voir le README.
+          - **Safari** : \`safari-xcode\` (job macOS) → ouvrir le projet dans Xcode, voir \`docs/extension-navigateur.md\`.
           - **LibreOffice** : \`certimens-libreoffice\` → *Outils › Gestionnaire des extensions ›
             Ajouter* → \`libreoffice.oxt\`, puis redémarrer LibreOffice.
           - **Word** : \`certimens-word\` dézippé dans \`dist/\` d'un clone du dépôt → \`npm run word:serve\`, puis charger
-            \`word-localhost.xml\` dans Word (voir le README).
+            \`word-localhost.xml\` dans Word (voir \`docs/complement-word.md\`).
           - **VS Code** : \`certimens-vscode\` → \`code --install-extension certimens-vscode.vsix\`
             (ou *Extensions › … › Installer à partir d'un VSIX*), puis recharger la fenêtre.
           EOF

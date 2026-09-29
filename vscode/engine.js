@@ -1,14 +1,14 @@
 // Certimens — VS Code extension, sending to the engine (the counterpart of
 // extension/background.js and libreoffice/pythonpath/certimens_agent/engine.py).
 //
-// Each source file of the project is tied to its own engine file (created on the first window
-// that carries real activity via POST /api/files, then remembered). Measurements go to
-// POST /api/files/:id/metrics, authenticating as the student with an API token (Bearer) created
+// Each source file of the project is tied to its own engine document (created on the first window
+// that carries real activity via POST /api/documents, then remembered). Measurements go to
+// POST /api/documents/:id/metrics, authenticating as the student with an API token (Bearer) created
 // at login and kept in the editor's secret storage, never in settings.json — a settings file is
 // synchronised, committed and read over the shoulder.
 //
 // A file only reaches the engine once the student has actually written in it: opening a project
-// of four hundred files must not create four hundred files on the engine.
+// of four hundred files must not create four hundred documents on the engine.
 //
 // When offline, windows stay in a persisted queue and are resent every minute.
 
@@ -58,14 +58,14 @@ class Engine {
         this.listeners = [];
         this.retryTimer = null;
         // Every read/write of the queue goes through this lock: a send and a new measurement
-        // never step on each other, nor create two files for the same document.
+        // never step on each other, nor create two documents for the same file.
         this.lock = Promise.resolve();
     }
 
     // --- 1. STORAGE ---
     state() {
         return {
-            files: this.store.get('files', {}),
+            engineIds: this.store.get('engineIds', {}),
             // Path of each file in the project: the last one seen, and the one last sent to the
             // engine. A file renamed or moved in the project is renamed on the engine too.
             names: this.store.get('names', {}),
@@ -131,9 +131,8 @@ class Engine {
     }
 
     // The User-Agent is set explicitly, and it is what the engine recognizes this agent by
-    // (clientFamily, internal/file/adapters/inbound/http/ingestion.go): Node sends none of the
-    // headers a browser adds on its own, so without it every push would be filed as coming from
-    // a client the platform does not know.
+    // (its client family): Node sends none of the headers a browser adds on its own, so without
+    // it every push would be filed as coming from a client the platform does not know.
     headers(token) {
         const headers = { 'Content-Type': 'application/json', 'User-Agent': this.userAgent };
         if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -196,13 +195,13 @@ class Engine {
     }
 
     // --- 3. FILES ---
-    // Creates the file's engine file if needed. The name sent is the project-relative path: an
+    // Creates the file's engine document if needed. The name sent is the project-relative path: an
     // absolute one would carry the student's account name to the engine for nothing.
-    async ensureFile(files, item) {
-        if (files[item.documentId]) return files[item.documentId];
-        const file = await this.api('POST', '/api/files', { document_name: item.documentName });
-        files[item.documentId] = file.id;
-        await this.store.set('files', files);
+    async ensureDocument(engineIds, item) {
+        if (engineIds[item.documentId]) return engineIds[item.documentId];
+        const file = await this.api('POST', '/api/documents', { name: item.documentName });
+        engineIds[item.documentId] = file.id;
+        await this.store.set('engineIds', engineIds);
         const syncedNames = this.store.get('syncedNames', {});
         syncedNames[item.documentId] = item.documentName;
         await this.store.set('syncedNames', syncedNames);
@@ -212,10 +211,10 @@ class Engine {
     // Propagates to the engine the files renamed or moved in the project since the last send.
     async syncNames(state) {
         for (const [documentId, name] of Object.entries(state.names)) {
-            const fileId = state.files[documentId];
-            if (!fileId || state.syncedNames[documentId] === name) continue;
+            const engineId = state.engineIds[documentId];
+            if (!engineId || state.syncedNames[documentId] === name) continue;
             try {
-                await this.api('PUT', `/api/files/${fileId}`, { document_name: name });
+                await this.api('PUT', `/api/documents/${engineId}`, { name: name });
             } catch (err) {
                 if (err.status !== 404) throw err; // 404: file deleted, recreated on the next send
             }
@@ -237,32 +236,32 @@ class Engine {
 
     // Engine file of a project file (null when none was created yet, or it was deleted there).
     async fileInfo(documentId) {
-        const fileId = this.store.get('files', {})[documentId];
-        if (!fileId) return { fileId: null, file: null };
+        const engineId = this.store.get('engineIds', {})[documentId];
+        if (!engineId) return { engineId: null, file: null };
         try {
-            return { fileId, file: await this.api('GET', `/api/files/${fileId}`) };
+            return { engineId, file: await this.api('GET', `/api/documents/${engineId}`) };
         } catch (err) {
             if (err.status !== 404) throw err;
             await this.forget(documentId);
-            return { fileId: null, file: null };
+            return { engineId: null, file: null };
         }
     }
 
     forget(documentId) {
         return this.withLock(async () => {
-            const files = this.store.get('files', {});
-            delete files[documentId];
-            await this.store.set('files', files);
+            const engineIds = this.store.get('engineIds', {});
+            delete engineIds[documentId];
+            await this.store.set('engineIds', engineIds);
         });
     }
 
-    // Explicit creation of a project file's engine file, from the panel; no-op if it exists.
+    // Explicit creation of a project file's engine document, from the panel; no-op if it exists.
     createFileFor(documentId, documentName) {
         return this.withLock(async () => {
-            const files = this.store.get('files', {});
-            const existed = !!files[documentId];
-            const fileId = await this.ensureFile(files, { documentId, documentName });
-            return { fileId, existed };
+            const engineIds = this.store.get('engineIds', {});
+            const existed = !!engineIds[documentId];
+            const engineId = await this.ensureDocument(engineIds, { documentId, documentName });
+            return { engineId, existed };
         });
     }
 
@@ -275,21 +274,21 @@ class Engine {
     }
 
     /**
-     * Sends a file's source to its engine file, replacing what was already sent. This is the one
+     * Sends a file's source to its engine document, replacing what was already sent. This is the one
      * place where the student's own text leaves the machine, and it only ever runs on an explicit
      * command: the measurement itself sends counters and nothing else.
      */
     async uploadDocument(documentId, text) {
-        const fileId = this.store.get('files', {})[documentId];
-        if (!fileId) throw new HttpError(404, t('error.noFile'));
+        const engineId = this.store.get('engineIds', {})[documentId];
+        if (!engineId) throw new HttpError(404, t('error.noFile'));
         const document = Buffer.from(text, 'utf8').toString('base64');
         if (document.length > MAX_UPLOAD_BASE64) throw new HttpError(413, t('error.tooLarge'));
-        return this.api('PUT', `/api/files/${fileId}`, { document });
+        return this.api('PUT', `/api/documents/${engineId}`, { document });
     }
 
     // The engine silently ignores an assignment the student isn't enrolled in: we detect it.
-    async submitFile(fileId, assignmentId) {
-        const file = await this.api('PUT', `/api/files/${fileId}`, { assignment_id: assignmentId });
+    async submitDocument(engineId, assignmentId) {
+        const file = await this.api('PUT', `/api/documents/${engineId}`, { assignment_id: assignmentId });
         if (file.assignment_id !== assignmentId) throw new HttpError(403, t('error.notEnrolled'));
         return file;
     }
@@ -303,15 +302,15 @@ class Engine {
 
     async pushItem(state, item) {
         for (let attempt = 0; attempt < 3; attempt++) {
-            const fileId = await this.ensureFile(state.files, item);
+            const engineId = await this.ensureDocument(state.engineIds, item);
             try {
-                await this.api('POST', `/api/files/${fileId}/metrics`, { metrics: this.metricsOf(item, state.extendedUnsupported) });
+                await this.api('POST', `/api/documents/${engineId}/metrics`, { metrics: this.metricsOf(item, state.extendedUnsupported) });
                 return;
             } catch (err) {
                 if (err.status === 404) {
                     // file deleted on the engine side: we recreate one for this project file
-                    delete state.files[item.documentId];
-                    await this.store.set('files', state.files);
+                    delete state.engineIds[item.documentId];
+                    await this.store.set('engineIds', state.engineIds);
                 } else if (err.status === 400 && err.code === 'metric_type_unknown' && !state.extendedUnsupported) {
                     // Only this code means the engine is older than the extended metrics. Any
                     // other 400 (an invalid period, a malformed body) must not latch this flag,

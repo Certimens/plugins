@@ -15,7 +15,7 @@ Une seule définition, quatre implémentations indépendantes :
 | Extension VS Code | `vscode/sensor.js` | le même fichier (modifications du document) |
 
 **Une règle changée dans l'une doit l'être dans les trois autres**, ou être justifiée par une
-limite de la plateforme (voir *Écarts assumés*). Le tableau des metrics du `README.md`
+limite de la plateforme (voir *Écarts assumés*). Le tableau des metrics de `docs/mesures.md`
 (section *Metrics envoyées*) est la référence lisible : il se met à jour dans le même commit.
 
 ## Constantes communes
@@ -118,9 +118,8 @@ l'agent retire ces trois metrics et renvoie le reste, puis réessaie à la proch
 Tout autre `400` (période invalide, corps mal formé) ne doit pas désactiver les metrics étendues :
 c'était le bug qui empêchait `focus_losses` de repartir.
 
-Les types acceptés sont déclarés côté moteur dans `internal/file/domain/metric.go`
-(`apperr.Invalidf("metric_type_unknown", …)`). Ajouter une metric, c'est donc **deux dépôts** :
-le moteur d'abord, les agents ensuite, avec la dégradation ci-dessus.
+La liste des types acceptés est tenue par le moteur, lui seul. Ajouter une metric, c'est donc
+**deux chantiers** : le moteur d'abord, les agents ensuite, avec la dégradation ci-dessus.
 
 ## Écarts assumés
 

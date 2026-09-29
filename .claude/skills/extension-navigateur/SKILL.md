@@ -51,7 +51,7 @@ La version vient de git. Release (tag `vX.Y.Z`) → `X.Y.Z` ; sinon dernier tag 
 
 `background.js` peut être arrêté à tout moment : aucun état en mémoire ne survit.
 
-- L'état vit dans `chrome.storage.local` (`config`, `files`, `titles`, `syncedTitles`, `queue`,
+- L'état vit dans `chrome.storage.local` (`config`, `engineIds`, `titles`, `syncedTitles`, `queue`,
   `status`) ; la file hors-ligne est plafonnée à `MAX_QUEUE` et rejouée par une **alarme**
   (`chrome.alarms`), jamais par `setInterval`.
 - Tout accès à la file passe par `withLock` : un envoi et une nouvelle mesure ne doivent ni se

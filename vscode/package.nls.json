@@ -10,7 +10,7 @@
     "command.flush": "Certimens : envoyer les mesures en attente",
     "command.focusPanel": "Certimens : ouvrir le panneau",
     "configuration.title": "Certimens",
-    "configuration.exclude": "Chemins qui ne sont pas mesurés : dépendances, sortie de compilation, fichiers générés. Un fichier exclu ne crée aucun fichier côté moteur.",
+    "configuration.exclude": "Chemins qui ne sont pas mesurés : dépendances, sortie de compilation, fichiers générés. Un fichier exclu ne crée aucun document côté moteur.",
     "capability.untrustedWorkspaces": "L'agent observe la frappe et n'exécute rien du projet.",
     "capability.virtualWorkspaces": "La mesure porte sur les fichiers d'un projet ouvert depuis le disque."
 }

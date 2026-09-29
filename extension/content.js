@@ -397,13 +397,13 @@ new MutationObserver(() => {
     setTimeout(() => { scanScheduled = false; scanEditorIframes(); }, 500);
 }).observe(document.documentElement, { subtree: true, childList: true });
 
-// Rename in the editor: the background renames the engine file. The title is polled
+// Rename in the editor: the background renames the engine document. The title is polled
 // periodically (Word Online doesn't always reflect it in document.title).
 const TITLE_CHECK_MS = 3000;
 let lastTitle = null;
 
 // Tells the background about the opened document, as soon as it's visible: if it doesn't yet have an
-// engine file, the creation popup opens.
+// engine document, the creation popup opens.
 function announceDocument() {
     const docId = editor.documentId();
     if (!docId || document.visibilityState !== 'visible') return false;

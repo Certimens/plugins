@@ -11,7 +11,7 @@ une langue que l'établissement n'utilise pas.
 
 ## La règle, la même partout
 
-C'est celle du moteur (`internal/user/domain.NormalizeLanguage`, dépôt `Certimens/engine`) :
+C'est celle du moteur :
 **une étiquette qui commence par `en` donne l'anglais, tout le reste donne le français.** Elle est
 réimplémentée dans chaque agent plutôt que demandée au moteur, parce qu'un agent doit choisir sa
 langue avant d'avoir jamais joint le moteur.
@@ -57,6 +57,6 @@ d'autre n'est possible pour un texte que l'hôte lit avant nous.
 
 Ajouter `es` demande quatre dictionnaires, quatre fiches, et surtout **de changer la règle** :
 `normalizeLanguage` ne connaît que deux langues parce que le moteur n'en connaît que deux. Une
-troisième langue commence donc côté moteur (`domain.NormalizeLanguage`, `SupportedLanguages`, les
-gabarits d'e-mails et le SPA), et les agents suivent — sinon l'étudiant choisirait dans son
+troisième langue commence donc côté moteur (la règle de normalisation, les langues acceptées,
+les gabarits d'e-mails et l'espace web), et les agents suivent — sinon l'étudiant choisirait dans son
 espace une langue que le moteur refuse d'enregistrer.

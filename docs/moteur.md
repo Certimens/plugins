@@ -1,0 +1,106 @@
+# Le contrat avec le moteur
+
+Tout ce qu'un agent attend du moteur Certimens, et rien de plus : les appels qu'il fait, ce
+qu'il présente, ce qu'il fait d'un refus. Le moteur lui-même — son code, son modèle de données,
+le calcul du score, son déploiement — est développé à part et n'est pas public : rien n'en est
+repris ni cité ici.
+
+## Adresse et authentification
+
+L'étudiant saisit l'**adresse du moteur** dans son agent (`https://monespace.certimens.fr` par
+défaut, `http://localhost:8080` pour un moteur local). La connexion se fait en trois temps :
+`POST /api/auth/login` vérifie les identifiants et ouvre une session, `POST /api/auth/tokens`
+crée avec elle un **jeton d'API** sans expiration — libellé d'après l'agent et la date, pour se
+reconnaître dans la liste —, puis `POST /api/auth/logout` referme la session, devenue inutile.
+
+C'est ce jeton qui est conservé, à la place du mot de passe, qui n'est jamais stocké. Il est
+sans expiration parce qu'un agent travaille sans surveillance, et **révocable** : depuis l'espace
+Certimens, ou par l'agent lui-même, qui supprime le sien (`DELETE /api/auth/tokens/:id`) quand
+l'étudiant se déconnecte. Un mot de passe recopié dans quatre agents, lui, ne se révoque pas.
+
+| Agent | Où le jeton est gardé |
+| --- | --- |
+| Extension navigateur | `chrome.storage.local` |
+| Complément Word | `localStorage` du volet (partagé entre documents) |
+| Extension LibreOffice | `certimens.json` du profil, lisible par l'utilisateur seul |
+| Extension VS Code | le **SecretStorage** de l'éditeur, jamais `settings.json` |
+
+## Endpoints utilisés
+
+| Appel | Usage |
+| --- | --- |
+| `POST /api/auth/login` | vérifier les identifiants et ouvrir une session |
+| `POST /api/auth/tokens` | créer le jeton d'API conservé par l'agent |
+| `POST /api/auth/logout` | refermer la session de connexion |
+| `DELETE /api/auth/tokens/:id` | révoquer son propre jeton, à la déconnexion |
+| `GET /api/auth/me` | rôle et langue du compte (le choix d'un devoir n'est proposé qu'au rôle `student`) |
+| `POST /api/documents` | créer le document Certimens qui recevra les mesures |
+| `GET /api/documents/:id` | relire son état (nom, devoir, score) pour l'afficher |
+| `POST /api/documents/:id/metrics` | pousser un lot de fenêtres de mesure |
+| `PUT /api/documents/:id` | renommer le document, le rattacher à un devoir, y déposer son contenu |
+| `GET /api/assignments` | les devoirs auxquels l'étudiant est rattaché |
+
+Le corps et les codes de retour de chaque appel sont documentés côté moteur ; ce que les agents
+en utilisent tient dans les pages de ce dossier.
+
+Le dépôt de contenu passe par `PUT /api/documents/:id` avec le document en base64, **18 Mo** au plus
+(le moteur plafonne la requête à 25 Mio). Un nouvel envoi remplace le document précédent.
+
+## File hors-ligne
+
+Aucun agent ne perd une mesure parce que le réseau manque : les fenêtres partent en **file
+d'attente**, renvoyée chaque minute. Le stockage diffère (`chrome.storage.local`,
+`localStorage`, `certimens.json`, stockage global de l'extension VS Code), le comportement non.
+
+Conséquence assumée, côté moteur : une fenêtre légitime peut précéder son propre document de
+plusieurs heures — un travail commencé hors ligne. L'ingestion ne traite donc pas comme suspecte
+une période antérieure à la création du document.
+
+## Metrics refusées
+
+`paste_events`, `focus_losses` et `median_flight_ms` sont plus récentes que certains moteurs
+déployés. Face à un **`400` portant le code `metric_type_unknown`** — et seulement celui-là —
+l'agent retire ces trois metrics et renvoie le reste, puis réessaie à la prochaine connexion.
+
+Tout autre `400` (période invalide, corps mal formé) ne doit **pas** désactiver les metrics
+étendues : c'était le bug qui empêchait `focus_losses` de repartir.
+
+La liste des types acceptés est tenue par le moteur, lui seul. **Ajouter une metric, c'est donc
+deux chantiers : le moteur d'abord, les agents ensuite**, avec la dégradation ci-dessus.
+
+## Comment un agent s'annonce
+
+Les agents sont livrés en clair : tout ce qu'on leur demande d'envoyer, un attaquant peut le
+recopier. Ce qu'ils présentent au moteur ne sert donc pas à prouver leur identité, mais à rendre
+une contrefaçon **visible** : le moteur en tire une famille de client, et signale sur le document
+un envoi qui ne ressemble à aucun agent connu.
+
+| Agent | Ce que le moteur reconnaît |
+| --- | --- |
+| Extension navigateur | la signature de transport d'un navigateur |
+| Complément Word | celle de la webview du volet Office |
+| Extension LibreOffice | `urllib` de la bibliothèque standard Python |
+| Extension VS Code | son `User-Agent` : `Certimens-VSCode/X.Y.Z (VS Code … ; Node …)` |
+
+L'extension VS Code est une exception assumée : elle tourne sur le `fetch` de Node, qui
+n'ajoute de lui-même aucun en-tête qui le trahisse — d'où le `User-Agent` explicite. La famille
+`vscode` doit être connue de l'ingestion du moteur, sinon chaque envoi est marqué
+`client_unknown` sur le document.
+
+Tous les agents posent exactement `application/json`, corps non indenté, clés dans l'ordre de
+leur sérialiseur : c'est ce que le moteur attend.
+
+## CORS
+
+Trois agents sur quatre n'ont pas de CORS : LibreOffice appelle depuis Python, VS Code depuis
+Node, l'extension navigateur depuis son service worker.
+
+Seul le **complément Word** est une page web, servie par GitHub Pages : le moteur autorise cette
+origine sur `/api`, avec `https://localhost:3000` pour le développement. La liste des origines
+autorisées est tenue côté moteur — changer l'hébergement du complément, c'est donc **aussi** un
+changement là-bas, à demander avant de publier.
+
+## Langue
+
+La règle de choix de la langue est celle du moteur, réimplémentée dans chaque agent — un agent
+doit choisir sa langue avant d'avoir jamais joint le moteur. Voir [langues.md](langues.md).

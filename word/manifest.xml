@@ -109,8 +109,8 @@
         <bt:String id="GetStarted.Description" DefaultValue="Ouvrez Certimens depuis l'onglet Accueil pour vous connecter et associer ce document à votre espace.">
           <bt:Override Locale="en-us" Value="Open Certimens from the Home tab to log in and link this document to your space."/>
         </bt:String>
-        <bt:String id="Button.Tooltip" DefaultValue="Connexion à Certimens, fichier du document et rendu sur un devoir.">
-          <bt:Override Locale="en-us" Value="Log in to Certimens, the document's file, and submitting to an assignment."/>
+        <bt:String id="Button.Tooltip" DefaultValue="Connexion à Certimens, document Certimens et rendu sur un devoir.">
+          <bt:Override Locale="en-us" Value="Log in to Certimens, the Certimens document, and submitting to an assignment."/>
         </bt:String>
       </bt:LongStrings>
     </Resources>

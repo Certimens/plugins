@@ -1,6 +1,6 @@
 """Interface languages of the LibreOffice agent (the counterpart of extension/i18n.js).
 
-Two languages and one rule, the engine's own (internal/user/domain.NormalizeLanguage): a tag
+Two languages and one rule, the engine's own: a tag
 starting with "en" gives English, everything else French. French is the default because the
 product is sold to French higher education — an unknown locale lands there rather than in a
 language the student's school does not use.
@@ -34,16 +34,16 @@ MESSAGES = {
         'error.networkError': 'erreur réseau',
         'error.unknown': 'erreur inconnue',
 
-        'doc.unlinked': "Ce document n'a pas encore de fichier Certimens.",
-        'doc.name': 'Nom du fichier',
-        'doc.create': 'Créer le fichier',
-        'doc.creating': 'Création du fichier…',
-        'doc.linked': 'Fichier Certimens associé : les mesures y sont envoyées.',
+        'doc.unlinked': "Ce document n'a pas encore de document Certimens.",
+        'doc.name': 'Nom du document',
+        'doc.create': 'Créer le document',
+        'doc.creating': 'Création du document…',
+        'doc.linked': 'Document Certimens associé : les mesures y sont envoyées.',
         'doc.openInCertimens': 'Ouvrir dans Certimens',
         'doc.submittedTo': 'Rendu sur : {title}',
         'doc.notSubmitted': 'Pas encore rendu sur un devoir.',
         'doc.alreadyUploaded': 'Un document est déjà envoyé : un nouvel envoi le remplace.',
-        'doc.gone': "Le fichier Certimens de ce document n'existe plus : recréez-le.",
+        'doc.gone': "Le document Certimens associé n'existe plus : recréez-le.",
         'doc.submit': 'Rendre sur ce devoir',
         'doc.changeAssignment': 'Changer de devoir',
 
@@ -57,9 +57,9 @@ MESSAGES = {
 
         'submit.refused': 'Rendu impossible : {message}.',
         'submit.busy': 'Rendu en cours…',
-        'submit.done': 'Fichier rendu.',
-        'create.existed': 'Ce document avait déjà un fichier.',
-        'create.created': 'Fichier créé.',
+        'submit.done': 'Document rendu.',
+        'create.existed': 'Ce document était déjà enregistré.',
+        'create.created': 'Document créé.',
 
         'upload.send': 'Envoyer le document',
         'upload.pick': 'Choisir un fichier .docx…',
@@ -104,16 +104,16 @@ MESSAGES = {
         'error.networkError': 'network error',
         'error.unknown': 'unknown error',
 
-        'doc.unlinked': 'This document has no Certimens file yet.',
-        'doc.name': 'File name',
-        'doc.create': 'Create the file',
-        'doc.creating': 'Creating the file…',
-        'doc.linked': 'Linked to a Certimens file: measurements are sent to it.',
+        'doc.unlinked': 'This document has no Certimens document yet.',
+        'doc.name': 'Document name',
+        'doc.create': 'Create the document',
+        'doc.creating': 'Creating the document…',
+        'doc.linked': 'Linked to a Certimens document: measurements are sent to it.',
         'doc.openInCertimens': 'Open in Certimens',
         'doc.submittedTo': 'Submitted to: {title}',
         'doc.notSubmitted': 'Not submitted to an assignment yet.',
         'doc.alreadyUploaded': 'A document has already been sent: sending another replaces it.',
-        'doc.gone': 'The Certimens file of this document no longer exists: create it again.',
+        'doc.gone': 'The linked Certimens document no longer exists: create it again.',
         'doc.submit': 'Submit to this assignment',
         'doc.changeAssignment': 'Change assignment',
 
@@ -127,9 +127,9 @@ MESSAGES = {
 
         'submit.refused': 'Submission refused: {message}.',
         'submit.busy': 'Submitting…',
-        'submit.done': 'File submitted.',
-        'create.existed': 'This document already had a file.',
-        'create.created': 'File created.',
+        'submit.done': 'Document submitted.',
+        'create.existed': 'This document was already registered.',
+        'create.created': 'Document created.',
 
         'upload.send': 'Send the document',
         'upload.pick': 'Choose a .docx file…',

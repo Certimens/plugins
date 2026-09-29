@@ -2,7 +2,7 @@
 //
 // Une traduction se vérifie surtout par ce qui manque : une clé présente dans une langue et pas
 // dans l'autre passe inaperçue jusqu'à ce qu'un étudiant tombe dessus. La règle de choix de la
-// langue, elle, est celle du moteur (internal/user/domain.NormalizeLanguage) et doit rester
+// langue, elle, est celle du moteur et doit rester
 // identique dans les quatre agents.
 
 import { test } from 'node:test';

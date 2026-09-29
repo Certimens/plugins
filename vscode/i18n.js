@@ -1,6 +1,6 @@
 // Certimens — VS Code extension, interface languages (the counterpart of extension/i18n.js).
 //
-// Two languages and one rule, the engine's own (internal/user/domain.NormalizeLanguage): a tag
+// Two languages and one rule, the engine's own: a tag
 // starting with "en" gives English, everything else French. French is the default because the
 // product is sold to French higher education — an unknown locale lands there rather than in a
 // language the student's school does not use.
@@ -39,7 +39,7 @@ const MESSAGES = {
         'error.noEditor': 'ouvrez le fichier à rendre',
         'error.notMeasured': "ce fichier n'est pas mesuré (hors projet, ou exclu)",
         'error.noToken': 'aucun jeton : connectez-vous à Certimens',
-        'error.noFile': "ce fichier n'a pas encore de fichier Certimens",
+        'error.noFile': "ce fichier n'a pas encore de document Certimens",
         'error.tooLarge': 'fichier trop volumineux (18 Mo maximum)',
         'error.notEnrolled': "vous n'êtes pas rattaché à ce devoir",
         'error.networkError': 'erreur réseau',
@@ -66,8 +66,8 @@ const MESSAGES = {
         'panel.pausedQueued': '{count} mesure d’avant la pause encore à envoyer.',
         'panel.pausedQueuedPlural': '{count} mesures d’avant la pause encore à envoyer.',
         'panel.openFile': 'Fichier ouvert',
-        'panel.linked': 'Fichier Certimens associé : les mesures y sont envoyées.',
-        'panel.unlinked': 'Aucun fichier Certimens : il sera créé dès que vous écrirez.',
+        'panel.linked': 'Document Certimens associé : les mesures y sont envoyées.',
+        'panel.unlinked': 'Aucun document Certimens : il sera créé dès que vous écrirez.',
         'panel.submit': 'Rendre ce fichier…',
         'panel.noFile': 'Ouvrez un fichier de votre projet : chaque fichier est mesuré séparément.',
         'panel.measured': 'Mesuré dans cette session',
@@ -111,7 +111,7 @@ const MESSAGES = {
         'error.noEditor': 'open the file you want to submit',
         'error.notMeasured': 'this file is not measured (outside the project, or excluded)',
         'error.noToken': 'no token: log in to Certimens',
-        'error.noFile': 'this file has no Certimens file yet',
+        'error.noFile': 'this file has no Certimens document yet',
         'error.tooLarge': 'file too large (18 MB maximum)',
         'error.notEnrolled': 'you are not enrolled in this assignment',
         'error.networkError': 'network error',
@@ -135,8 +135,8 @@ const MESSAGES = {
         'panel.pausedQueued': '{count} measurement from before the pause still to send.',
         'panel.pausedQueuedPlural': '{count} measurements from before the pause still to send.',
         'panel.openFile': 'Open file',
-        'panel.linked': 'Linked to a Certimens file: measurements are sent to it.',
-        'panel.unlinked': 'No Certimens file: one is created as soon as you write.',
+        'panel.linked': 'Linked to a Certimens document: measurements are sent to it.',
+        'panel.unlinked': 'No Certimens document: one is created as soon as you write.',
         'panel.submit': 'Submit this file…',
         'panel.noFile': 'Open a file of your project: each file is measured separately.',
         'panel.measured': 'Measured in this session',

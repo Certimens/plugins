@@ -10,7 +10,7 @@
     "command.flush": "Certimens: send the waiting measurements",
     "command.focusPanel": "Certimens: open the panel",
     "configuration.title": "Certimens",
-    "configuration.exclude": "Paths that are not measured: dependencies, build output, generated files. An excluded file never creates a file on the engine.",
+    "configuration.exclude": "Paths that are not measured: dependencies, build output, generated files. An excluded file never creates a document on the engine.",
     "capability.untrustedWorkspaces": "The agent watches typing and runs nothing from the project.",
     "capability.virtualWorkspaces": "Measurement covers the files of a project opened from disk."
 }

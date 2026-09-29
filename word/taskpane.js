@@ -1,8 +1,8 @@
-// Word add-in task pane: student login, the open document's Certimens file,
+// Word add-in task pane: student login, the open document's Certimens document,
 // assignment submission and .docx upload (the counterpart of extension/popup.js). The page stays
 // loaded when the task pane is closed (shared runtime): it is what keeps the measurement running.
 
-let current = { docId: null, fileId: null, assignmentId: null };
+let current = { docId: null, engineId: null, assignmentId: null };
 
 function formatDeadline(iso) {
     return new Date(iso).toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short' });
@@ -24,7 +24,7 @@ async function loadAssignments() {
     }
     assignments.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
     select.replaceChildren(
-        Object.assign(document.createElement('option'), { value: '', textContent: t(current.fileId ? 'assignment.choose' : 'assignment.none') }),
+        Object.assign(document.createElement('option'), { value: '', textContent: t(current.engineId ? 'assignment.choose' : 'assignment.none') }),
         ...assignments.map((a) => Object.assign(document.createElement('option'), {
             value: a.id,
             textContent: t(new Date(a.deadline) < new Date() ? 'assignment.overdue' : 'assignment.due', { title: a.title, date: formatDeadline(a.deadline) }),
@@ -35,13 +35,13 @@ async function loadAssignments() {
 }
 
 function showLinked(file) {
-    current.fileId = file.id;
+    current.engineId = file.id;
     current.assignmentId = file.assignment_id;
     $('create').hidden = true;
     $('createBtn').hidden = true;
     $('linked').hidden = false;
-    $('linkedName').textContent = file.document_name;
-    $('open').href = `${trimUrl(getConfig().engineUrl)}/file/${file.id}`;
+    $('linkedName').textContent = file.name;
+    $('open').href = `${trimUrl(getConfig().engineUrl)}/document/${file.id}`;
     $('submitted').hidden = !file.assignment_id;
     $('submitted').textContent = file.assignment_title
         ? t('doc.submittedTo', { title: file.assignment_title })
@@ -63,7 +63,7 @@ function loadWithDocument() {
 
 function updateSubmitButton() {
     const chosen = $('assignment').value;
-    $('submit').hidden = !current.fileId || $('assignmentBox').hidden || !chosen || chosen === current.assignmentId;
+    $('submit').hidden = !current.engineId || $('assignmentBox').hidden || !chosen || chosen === current.assignmentId;
     $('submit').textContent = t(current.assignmentId ? 'doc.changeAssignment' : 'doc.submit');
 }
 
@@ -89,9 +89,9 @@ function renderSync() {
     $('sync').textContent = labels[status.state] || (queue.length ? t('sync.queued', { count: queue.length }) : '');
 }
 
-async function submitTo(fileId, assignmentId) {
+async function submitTo(engineId, assignmentId) {
     try {
-        return await submitFile(fileId, assignmentId);
+        return await submitDocument(engineId, assignmentId);
     } catch (err) {
         showMessage(err.status === 403 ? t('submit.refused', { message: err.message }) : errorText(failure(err)), false);
         return null;
@@ -118,13 +118,13 @@ async function render() {
     }
 
     $('who').textContent = config.email;
-    let info = { fileId: null, file: null };
+    let info = { engineId: null, file: null };
     try {
         info = await docInfo(current.docId);
     } catch (err) {
         showMessage(errorText(failure(err)), false);
     }
-    current.fileId = info.fileId || null;
+    current.engineId = info.engineId || null;
     current.assignmentId = info.file?.assignment_id || null;
     await loadAssignments();
     if (info.file) {
@@ -173,7 +173,7 @@ $('create').addEventListener('submit', async (e) => {
         return;
     }
     let file = null;
-    if (assignmentId) file = await submitTo(res.fileId, assignmentId);
+    if (assignmentId) file = await submitTo(res.engineId, assignmentId);
     button.disabled = false;
     if (assignmentId && !file) {
         render(); // file created but not submitted: the error message stays on screen
@@ -188,7 +188,7 @@ $('assignment').addEventListener('change', updateSubmitButton);
 $('submit').addEventListener('click', async () => {
     const button = $('submit');
     button.disabled = true;
-    const file = await submitTo(current.fileId, $('assignment').value);
+    const file = await submitTo(current.engineId, $('assignment').value);
     button.disabled = false;
     if (!file) return;
     showMessage(t('submit.done'), true);

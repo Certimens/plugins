@@ -26,7 +26,7 @@ longueur sont affichés par le Partner Center à côté de chaque champ : s'y fi
 >
 > Depuis le volet Certimens, l'étudiant :
 > - se connecte à son espace Certimens ;
-> - associe le document à un fichier Certimens ;
+> - associe le document à un document Certimens ;
 > - le rend sur un devoir de sa classe ;
 > - envoie la version .docx du document.
 >
@@ -74,7 +74,7 @@ au moins un devoir), sur le moteur de production :
 > 3. Cliquer sur « Créer le fichier » (choisir le devoir « … » pour tester le rendu).
 > 4. Écrire quelques phrases : les compteurs sont envoyés après 2 secondes sans frappe ; le
 >    volet affiche « Mesures à jour. ».
-> 5. « Envoyer le .docx » envoie le document au fichier Certimens ; « Ouvrir dans Certimens »
+> 5. « Envoyer le .docx » envoie le document au document Certimens ; « Ouvrir dans Certimens »
 >    l'affiche dans l'espace de l'étudiant.
 >
 > Le complément fonctionne dans Word pour Windows et Mac (Microsoft 365) et Word sur le web ; il

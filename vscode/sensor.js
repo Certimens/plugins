@@ -9,7 +9,7 @@
 // browser gives, since no key is ever seen.
 //
 // One sensor per open document: a project is measured file by file, each file carrying its own
-// windows, and the host (extension.js) ties each of them to its own engine file.
+// windows, and the host (extension.js) ties each of them to its own engine document.
 //
 // Same definitions as the browser extension, with these differences:
 // - a keystroke is an inserted or erased character, as in the Word add-in (a key with no effect

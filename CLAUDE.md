@@ -2,25 +2,34 @@
 
 Les **agents de mesure** de Certimens : quatre implémentations d'un même capteur de rédaction.
 
-Ce dépôt (`Certimens/plugins`) est **autonome**. Le moteur qui reçoit les mesures vit dans un
-autre dépôt (`Certimens/engine`) : il peut être cloné à côté, ou pas du tout. Rien ici ne doit
-donc supposer son chemin sur le disque ni dépendre de ses fichiers — ses `CLAUDE.md`, skills et
-outillage ne sont pas chargés quand on travaille sur ce seul dépôt. Quand une modification touche
-les deux (ajouter une metric, changer l'origine CORS autorisée), les skills le disent
-explicitement et nomment le fichier concerné côté moteur.
+Ce dépôt est **autonome**. Le moteur qui reçoit les mesures est développé à part, dans un dépôt
+**privé** : rien ici ne doit supposer son chemin sur le disque, dépendre de ses fichiers, ni le
+citer — ni son nom, ni ses chemins de code, ni ses pages de documentation. Ce dépôt-ci est
+public : ce qu'on écrit du moteur se limite à ce que son **API** expose, et qu'un agent doit de
+toute façon connaître. Quand une modification touche les deux côtés (ajouter une metric, changer
+l'origine CORS autorisée), les skills le disent explicitement, sans nommer le fichier d'en
+face.
 
 | Dossier | Ce que c'est |
 | --- | --- |
 | `extension/` | extension navigateur MV3 (Google Docs, Word Online) — Chrome, Firefox, Safari, Edge, Opera |
 | `word/` | complément Office pour Word (Office.js, servi par GitHub Pages) |
 | `libreoffice/` | extension Writer en Python/UNO, paquet `.oxt` |
-| `vscode/` | extension Visual Studio Code, paquet `.vsix` — un fichier moteur par fichier du projet |
+| `vscode/` | extension Visual Studio Code, paquet `.vsix` — un document moteur par fichier du projet |
 | `scripts/` | build des paquets, certificat de dev Word, visuels de marque |
 | `legacy/` | anciens agents de bureau, conservés pour référence — ne pas faire évoluer |
 
-Le `README.md` est la documentation de référence (installation, metrics, CI, publication dans
-chaque boutique) : le lire avant d'intervenir, et le tenir à jour dans le même commit que le code
-qu'il décrit.
+La documentation de référence vit dans **`docs/`** ([docs/README.md](docs/README.md) en est le
+sommaire) : `mesures.md` (ce que comptent les agents), une page par agent, `langues.md`,
+`moteur.md` (le contrat avec le moteur), `developpement.md` et `publication.md`. Le `README.md`
+de la racine n'est qu'une porte d'entrée. Lire la page concernée avant d'intervenir, et la tenir
+à jour dans le même commit que le code qu'elle décrit.
+
+Ce qui est décidé par le moteur — types de metrics acceptés, origine CORS autorisée, familles de
+client, calcul du score — se documente **côté moteur** ; `docs/moteur.md` dit seulement ce que
+les agents en présentent. **Le dépôt du moteur n'est pas public : ne jamais le citer ici**, ni
+son nom, ni ses chemins de fichiers, ni ses pages de documentation. On parle du « moteur » et de
+son API, rien de plus.
 
 ## Skills à charger
 

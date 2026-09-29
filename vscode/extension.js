@@ -2,12 +2,12 @@
 // finished windows to the engine client.
 //
 // A project is measured file by file. Each file the student writes in gets its own sensor, its
-// own measurement windows and its own engine file, so a project of twenty files arrives as
+// own measurement windows and its own engine document, so a project of twenty files arrives as
 // twenty documents rather than one undifferentiated blob — which is what a teacher grades.
 //
 // Nothing is created on the engine for a file that is merely opened: a sensor exists locally as
 // soon as a document is touched, and it reaches the engine only when a window carries real
-// activity (see Engine.ensureFile).
+// activity (see Engine.ensureDocument).
 
 const crypto = require('node:crypto');
 const vscode = require('vscode');
@@ -175,11 +175,11 @@ class Agent {
         this.refreshStatus();
     }
 
-    // A file renamed or moved keeps its measurements: the engine file is renamed, not replaced.
+    // A file renamed or moved keeps its measurements: the engine document is renamed, not replaced.
     // Its documentId still carries the old path, which is what ties the two together — renaming
     // the id instead would orphan every window already queued under it.
     onRename(event) {
-        for (const { oldUri, newUri } of event.files) {
+        for (const { oldUri, newUri } of event.engineIds) {
             const sensor = this.sensors.get(oldUri.toString());
             if (sensor) {
                 sensor.flush('rename');
@@ -190,7 +190,7 @@ class Agent {
             if (!from || !to) continue;
             const relative = vscode.workspace.asRelativePath(oldUri, false).replace(/\\/g, '/');
             const documentId = `vscode:${projectId(from)}:${relative}`;
-            if (!this.engine.state().files[documentId]) continue;
+            if (!this.engine.state().engineIds[documentId]) continue;
             const documentName = `${to.name}/${vscode.workspace.asRelativePath(newUri, false).replace(/\\/g, '/')}`;
             this.engine.noteName(documentId, documentName).then(() => this.engine.drain()).catch(warn);
         }
@@ -231,8 +231,8 @@ class Agent {
     }
 }
 
-// The user agent the engine recognizes this agent by (clientFamily, in the engine's
-// internal/file/adapters/inbound/http/ingestion.go). Node sends none of the headers a browser
+// The user agent the engine recognizes this agent by (its client family). Node sends none of
+// the headers a browser
 // adds on its own, so without it every push would be filed as coming from a client the platform
 // does not know. It carries the extension's version and the editor's, the way a browser's does —
 // what it must not carry is anything naming the student.
@@ -332,8 +332,8 @@ async function submit(agent) {
         vscode.window.showInformationMessage(t('submit.sentNoAssignment', { name: identity.documentName }));
         return;
     }
-    const { fileId } = await agent.engine.fileInfo(identity.documentId);
-    await agent.engine.submitFile(fileId, picked.id);
+    const { engineId } = await agent.engine.fileInfo(identity.documentId);
+    await agent.engine.submitDocument(engineId, picked.id);
     vscode.window.showInformationMessage(t('notify.submitted', { name: identity.documentName, assignment: picked.label }));
 }
 

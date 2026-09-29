@@ -1,4 +1,4 @@
-// Popup: student login and creation of the Certimens file for the open document
+// Popup: student login and creation of the Certimens document for the open document
 // (Google Docs or Word Online).
 
 // Google Docs export hosts: docs.google.com redirects to googleusercontent.com.
@@ -17,7 +17,7 @@ async function activeDocument() {
     }
 }
 
-let current = { engineUrl: DEFAULT_ENGINE_URL, doc: null, fileId: null, assignmentId: null, paused: false };
+let current = { engineUrl: DEFAULT_ENGINE_URL, doc: null, engineId: null, assignmentId: null, paused: false };
 
 function formatDeadline(iso) {
     return new Date(iso).toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short' });
@@ -30,7 +30,7 @@ async function loadAssignments() {
     const assignments = res.ok ? res.assignments : [];
     assignments.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
     select.replaceChildren(
-        Object.assign(document.createElement('option'), { value: '', textContent: t(current.fileId ? 'assignment.choose' : 'assignment.none') }),
+        Object.assign(document.createElement('option'), { value: '', textContent: t(current.engineId ? 'assignment.choose' : 'assignment.none') }),
         ...assignments.map((a) => Object.assign(document.createElement('option'), {
             value: a.id,
             textContent: t(new Date(a.deadline) < new Date() ? 'assignment.overdue' : 'assignment.due', { title: a.title, date: formatDeadline(a.deadline) }),
@@ -42,13 +42,13 @@ async function loadAssignments() {
 }
 
 function showLinked(file) {
-    current.fileId = file.id;
+    current.engineId = file.id;
     current.assignmentId = file.assignment_id;
     $('create').hidden = true;
     $('createBtn').hidden = true;
     $('linked').hidden = false;
-    $('linkedName').textContent = file.document_name;
-    $('open').href = `${current.engineUrl}/file/${file.id}`;
+    $('linkedName').textContent = file.name;
+    $('open').href = `${current.engineUrl}/document/${file.id}`;
     $('submitted').hidden = !file.assignment_id;
     $('submitted').textContent = file.assignment_title
         ? t('doc.submittedTo', { title: file.assignment_title })
@@ -69,12 +69,12 @@ function showUpload(file) {
 
 function updateSubmitButton() {
     const chosen = $('assignment').value;
-    $('submit').hidden = !current.fileId || $('assignmentBox').hidden || !chosen || chosen === current.assignmentId;
+    $('submit').hidden = !current.engineId || $('assignmentBox').hidden || !chosen || chosen === current.assignmentId;
     $('submit').textContent = t(current.assignmentId ? 'doc.changeAssignment' : 'doc.submit');
 }
 
-async function submitTo(fileId, assignmentId) {
-    const res = await chrome.runtime.sendMessage({ type: 'CERTIMENS_SUBMIT_FILE', fileId, assignmentId });
+async function submitTo(engineId, assignmentId) {
+    const res = await chrome.runtime.sendMessage({ type: 'CERTIMENS_SUBMIT_FILE', engineId, assignmentId });
     if (!res.ok) {
         showMessage(res.status === 403 ? t('submit.refused', { message: res.message }) : errorText(res), false);
         return null;
@@ -113,7 +113,7 @@ async function render() {
 
     const info = await chrome.runtime.sendMessage({ type: 'CERTIMENS_DOC_INFO', documentId: current.doc.id });
     if (!info.ok) showMessage(errorText(info), false);
-    current.fileId = info.fileId || null;
+    current.engineId = info.engineId || null;
     current.assignmentId = info.file?.assignment_id || null;
     await loadAssignments();
     if (info.file) {
@@ -167,7 +167,7 @@ $('create').addEventListener('submit', async (e) => {
         return;
     }
     let file = null;
-    if (assignmentId) file = await submitTo(res.fileId, assignmentId);
+    if (assignmentId) file = await submitTo(res.engineId, assignmentId);
     button.disabled = false;
     if (assignmentId && !file) {
         render(); // file created but not submitted: the error message stays displayed
@@ -182,7 +182,7 @@ $('assignment').addEventListener('change', updateSubmitButton);
 $('submit').addEventListener('click', async () => {
     const button = $('submit');
     button.disabled = true;
-    const file = await submitTo(current.fileId, $('assignment').value);
+    const file = await submitTo(current.engineId, $('assignment').value);
     button.disabled = false;
     if (!file) return;
     showMessage(t('submit.done'), true);
@@ -216,7 +216,7 @@ $('exportDocx').addEventListener('click', () => {
 });
 
 $('docxFile').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
+    const file = e.target.engineIds[0];
     e.target.value = '';
     if (!file) return;
     const bytes = new Uint8Array(await file.arrayBuffer());

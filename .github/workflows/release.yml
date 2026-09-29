@@ -8,7 +8,7 @@ name: Release
 #    Add-ons, Opera Add-ons). Un store sans identifiants configurés est ignoré ; un store en
 #    échec ne bloque pas les autres (relancer son job seul).
 # La première publication dans chaque store, et toute publication Safari, se font à la main
-# (voir README).
+# (voir docs/publication.md).
 on:
   push:
     tags: ["v*"]
@@ -97,7 +97,7 @@ jobs:
 
   # Visual Studio Marketplace : un seul paquet, publié avec le jeton (PAT) de l'éditeur. Open VSX
   # (VSCodium, Cursor, Gitpod) n'a pas d'API gratuite pour un éditeur vérifié : sa publication
-  # reste manuelle, comme celle de Safari (voir README).
+  # reste manuelle, comme celle de Safari (voir docs/publication.md).
   marketplace:
     name: Publish to VS Code Marketplace
     needs: github

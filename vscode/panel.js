@@ -100,8 +100,8 @@ class CertimensPanel {
         h1 { font-size: 1.35rem; }
         h2 { font-size: 1rem; font-weight: 700; letter-spacing: 0; word-break: break-all; }
         .card { padding: 16px; }
-        .files { max-height: 180px; overflow-y: auto; }
-        .files div { padding: 2px 0; word-break: break-all; }
+        .engineIds { max-height: 180px; overflow-y: auto; }
+        .engineIds div { padding: 2px 0; word-break: break-all; }
     </style>
 </head>
 <body class="stack" style="gap: 12px">
@@ -153,7 +153,7 @@ class CertimensPanel {
 
         <div class="card stack" style="gap: 8px">
             <div id="measuring" class="muted small">${esc(t('panel.measured'))}</div>
-            <div id="files" class="files small"></div>
+            <div id="engineIds" class="engineIds small"></div>
         </div>
     </div>
 
@@ -213,14 +213,14 @@ class CertimensPanel {
             $('logout').setAttribute('aria-label', state.labels.logout);
             $('logout').title = state.labels.logoutTip;
 
-            $('files').textContent = '';
-            for (const name of state.files) {
+            $('engineIds').textContent = '';
+            for (const name of state.engineIds) {
                 const row = document.createElement('div');
                 row.textContent = name;
-                $('files').appendChild(row);
+                $('engineIds').appendChild(row);
             }
-            if (state.files.length === 0) $('files').textContent = state.labels.noneMeasured;
-            show('files', !state.paused);
+            if (state.engineIds.length === 0) $('engineIds').textContent = state.labels.noneMeasured;
+            show('engineIds', !state.paused);
 
             const message = $('message');
             message.textContent = state.status.text;
@@ -235,7 +235,7 @@ class CertimensPanel {
     refresh() {
         if (!this.view) return;
         const engine = this.agent.engine;
-        const { queue, status, files } = engine.state();
+        const { queue, status, engineIds } = engine.state();
         const config = engine.config();
         const editor = vscode.window.activeTextEditor;
         const identity = editor ? this.agent.identify(editor.document) : null;
@@ -257,10 +257,10 @@ class CertimensPanel {
                     noneMeasured: t('panel.measuredNone'),
                 },
                 status: statusText(status, queue.length, this.agent.paused()),
-                document: identity && { name: identity.documentName, linked: !!files[identity.documentId] },
+                document: identity && { name: identity.documentName, linked: !!engineIds[identity.documentId] },
                 // The files measured since this window opened, which is what the student can
                 // check against what the engine shows.
-                files: [...this.agent.sensors.values()].map((sensor) => sensor.documentName).sort(),
+                engineIds: [...this.agent.sensors.values()].map((sensor) => sensor.documentName).sort(),
             });
         }, () => {});
     }

@@ -20,7 +20,7 @@ onglet par langue), à partir de ces messages et des textes ci-dessous — dont 
 
 > Enregistre localement la configuration de l'extension (adresse du serveur Certimens, e-mail de
 > l'étudiant et un jeton d'accès obtenu à la connexion — le mot de passe n'est pas conservé) et le lien entre chaque document
-> Google Docs / Word Online et son fichier Certimens. Sert aussi de file d'attente : quand
+> Google Docs / Word Online et son document Certimens. Sert aussi de file d'attente : quand
 > l'étudiant est hors ligne ou que le serveur ne répond pas, les mesures (des compteurs, jamais
 > de texte) y sont gardées puis envoyées dès que la connexion revient. Une clé retient aussi que
 > l'étudiant a suspendu la mesure depuis la fenêtre de l'extension, pour que la suspension

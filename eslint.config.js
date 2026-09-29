@@ -33,7 +33,7 @@ const agentGlobals = {
     documentName: 'readonly', isWordOnline: 'readonly', trimUrl: 'readonly', noteTitle: 'readonly',
     login: 'readonly', logout: 'readonly', createFileFor: 'readonly', docInfo: 'readonly',
     isPaused: 'readonly', setPaused: 'readonly',
-    listAssignments: 'readonly', uploadDocx: 'readonly', submitFile: 'readonly', enqueue: 'readonly',
+    listAssignments: 'readonly', uploadDocx: 'readonly', submitDocument: 'readonly', enqueue: 'readonly',
     startAgent: 'readonly',
 };
 

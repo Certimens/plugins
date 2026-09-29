@@ -1,5 +1,5 @@
 """Certimens windows for Writer (the counterpart of extension/popup.js): student login, the
-document's engine file, the assignment it is submitted to, and sending the .docx.
+document's engine document, the assignment it is submitted to, and sending the .docx.
 
 LibreOffice has no HTML popup: the windows are built control by control
 (com.sun.star.awt.UnoControlDialogModel), laid out in appfont units from top to bottom. Two of
@@ -305,7 +305,7 @@ class LoginWindow(Window):
 
 
 class DocumentWindow(Window):
-    """The open document: its Certimens file, its assignment and sending the .docx.
+    """The open document: its Certimens document, its assignment and sending the .docx.
 
     The layout is decided from what is known locally (does the document already have a file?);
     what comes from the engine — the file, the assignments — fills in afterwards.
@@ -318,13 +318,13 @@ class DocumentWindow(Window):
         self.doc = doc
         self.sensor = agent.sensor(doc)
         self.doc_id = self.sensor.doc_id
-        self.file_id = self.engine.file_id(self.doc_id) if self.doc_id else None
+        self.engine_id = self.engine.engine_id(self.doc_id) if self.doc_id else None
         self.file = None
         self.assignments = []
 
         self.text('who', t('account.connectedAs', email=self.engine.config().get('email') or ''), height=9)
         self.line()
-        if self.file_id:
+        if self.engine_id:
             self._linked_controls()
         else:
             self._create_controls()
@@ -357,7 +357,7 @@ class DocumentWindow(Window):
         self.button('open', t('doc.openInCertimens'), self.open_in_browser)
 
     def ready(self):
-        if self.file_id:
+        if self.engine_id:
             self.show('pick', False)
         if self.note:
             self.message(self.note)
@@ -400,7 +400,7 @@ class DocumentWindow(Window):
             self.fill_assignments()
             if file:
                 self.show_file(file)
-            elif self.file_id:
+            elif self.engine_id:
                 # the file was deleted on the engine side: the window reopens on creation
                 self.message(t('doc.gone'))
                 self.close('reopen')
@@ -418,8 +418,8 @@ class DocumentWindow(Window):
 
     def show_file(self, file):
         self.file = file
-        self.file_id = file['id']
-        self.label('name', file.get('document_name') or self.sensor.name)
+        self.engine_id = file['id']
+        self.label('name', file.get('name') or self.sensor.name)
         self.label('submitted', t('doc.submittedTo', title=file['assignment_title'])
                    if file.get('assignment_title') else t('doc.notSubmitted'))
         self.label('uploadHint', t('doc.alreadyUploaded') if file.get('content_type') else '')
@@ -436,9 +436,9 @@ class DocumentWindow(Window):
         document_id = self.sensor.ensure_id()
 
         def work():
-            file_id, existed = self.engine.create_file(document_id, name, self.sensor.name)
+            engine_id, existed = self.engine.create_file(document_id, name, self.sensor.name)
             if assignment_id:
-                return self.engine.submit(file_id, assignment_id), existed
+                return self.engine.submit(engine_id, assignment_id), existed
             return self.engine.doc_info(document_id), existed
 
         def done(result, error):
@@ -448,7 +448,7 @@ class DocumentWindow(Window):
             file, existed = result
             self.sensor.clear_infobar()
             if file:
-                self.file_id = file['id']
+                self.engine_id = file['id']
             self.close(('reopen', t('create.existed' if existed else 'create.created')))
 
         self.call(work, done, busy=t('doc.creating'))
@@ -467,7 +467,7 @@ class DocumentWindow(Window):
             self.show_file({**(self.file or {}), **file})
             self.message(t('submit.done'))
 
-        self.call(lambda: self.engine.submit(self.file_id, assignment_id), done, busy=t('submit.busy'))
+        self.call(lambda: self.engine.submit(self.engine_id, assignment_id), done, busy=t('submit.busy'))
 
     def upload(self):
         """One click: Writer exports the open document, and it goes to the engine."""
@@ -496,7 +496,7 @@ class DocumentWindow(Window):
         self.call(lambda: self.engine.upload_docx(self.doc_id, document), done, busy='Envoi du document…')
 
     def open_in_browser(self):
-        url = '%s/file/%s' % (self.engine.config()['engineUrl'].rstrip('/'), self.file_id)
+        url = '%s/file/%s' % (self.engine.config()['engineUrl'].rstrip('/'), self.engine_id)
         shell = self.ctx.ServiceManager.createInstanceWithContext('com.sun.star.system.SystemShellExecute', self.ctx)
         shell.execute(url, '', URIS_ONLY)
 

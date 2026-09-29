@@ -1,7 +1,7 @@
 // Certimens — writing agent, background: pushes measurement windows to the engine.
 //
-// Each document (Google Docs or Word Online) is tied to an engine file (created on the first send via
-// POST /api/files, then remembered). Measurements are sent to POST /api/files/:id/metrics,
+// Each document (Google Docs or Word Online) is tied to an engine document (created on the first send via
+// POST /api/documents, then remembered). Measurements are sent to POST /api/documents/:id/metrics,
 // authenticating with an API token (Bearer) created at login and kept in place of the
 // password. When offline, they stay in a persisted queue (chrome.storage.local) and are
 // resent every minute.
@@ -48,13 +48,13 @@ function hasAuth(config) {
 }
 
 async function getState() {
-    const s = await chrome.storage.local.get(['files', 'titles', 'syncedTitles', 'queue', 'status', 'extendedUnsupported', 'paused']);
+    const s = await chrome.storage.local.get(['engineIds', 'titles', 'syncedTitles', 'queue', 'status', 'extendedUnsupported', 'paused']);
     return {
         // Suspended measurement: the content scripts read this key themselves (see content.js).
         // Nothing is gated here — the queue keeps draining while paused, because what was already
         // measured belongs to the engine.
         paused: !!s.paused,
-        files: s.files || {},
+        engineIds: s.engineIds || {},
         // Document title in the editor: the last one seen, and the one from the last send to the engine.
         titles: s.titles || {},
         syncedTitles: s.syncedTitles || {},
@@ -70,7 +70,7 @@ async function setStatus(status) {
 }
 
 // Every read/write of the queue goes through this lock: a send and a new
-// measurement never step on each other (nor create two files for the same document).
+// measurement never step on each other (nor create two documents for the same one).
 let lock = Promise.resolve();
 function withLock(fn) {
     const run = lock.then(fn, fn);
@@ -135,16 +135,16 @@ async function createApiToken(engineUrl, email, password) {
     return { me, token: token.token, tokenId: token.id };
 }
 
-// Creates the document's engine file if needed. editorTitle is the document title in
+// Creates the document's engine document if needed. editorTitle is the document title in
 // the editor at that moment: it serves as the reference for detecting a later rename, even if the
 // file was given another name in the popup.
-async function ensureFile(config, files, item, editorTitle = item.documentName) {
-    if (files[item.documentId]) return files[item.documentId];
-    const file = await api(config, 'POST', '/api/files', { document_name: item.documentName });
-    files[item.documentId] = file.id;
+async function ensureDocument(config, engineIds, item, editorTitle = item.documentName) {
+    if (engineIds[item.documentId]) return engineIds[item.documentId];
+    const file = await api(config, 'POST', '/api/documents', { name: item.documentName });
+    engineIds[item.documentId] = file.id;
     const { syncedTitles = {} } = await chrome.storage.local.get('syncedTitles');
     syncedTitles[item.documentId] = editorTitle;
-    await chrome.storage.local.set({ files, syncedTitles });
+    await chrome.storage.local.set({ engineIds, syncedTitles });
     return file.id;
 }
 
@@ -152,10 +152,10 @@ async function ensureFile(config, files, item, editorTitle = item.documentName) 
 // The name chosen in the popup is kept as long as the document title doesn't change.
 async function syncTitles(config, state) {
     for (const [documentId, title] of Object.entries(state.titles)) {
-        const fileId = state.files[documentId];
-        if (!fileId || state.syncedTitles[documentId] === title) continue;
+        const engineId = state.engineIds[documentId];
+        if (!engineId || state.syncedTitles[documentId] === title) continue;
         try {
-            await api(config, 'PUT', `/api/files/${fileId}`, { document_name: title });
+            await api(config, 'PUT', `/api/documents/${engineId}`, { name: title });
         } catch (err) {
             if (err.status !== 404) throw err; // 404: file deleted, recreated on the next send
         }
@@ -185,14 +185,14 @@ async function login({ engineUrl, email, password }) {
     return me;
 }
 
-// Explicit (popup) creation of a document's engine file; no-op if it already exists.
+// Explicit (popup) creation of a document's engine document; no-op if it already exists.
 function createFileFor(documentId, documentName, editorTitle) {
     return withLock(async () => {
         const config = await getConfig();
-        const { files } = await getState();
-        const existed = !!files[documentId];
-        const fileId = await ensureFile(config, files, { documentId, documentName }, editorTitle || documentName);
-        return { fileId, existed };
+        const { engineIds } = await getState();
+        const existed = !!engineIds[documentId];
+        const engineId = await ensureDocument(config, engineIds, { documentId, documentName }, editorTitle || documentName);
+        return { engineId, existed };
     });
 }
 
@@ -204,15 +204,15 @@ function toMetrics(item, dropExtended) {
 
 async function pushItem(config, state, item) {
     for (let attempt = 0; attempt < 3; attempt++) {
-        const fileId = await ensureFile(config, state.files, item);
+        const engineId = await ensureDocument(config, state.engineIds, item);
         try {
-            await api(config, 'POST', `/api/files/${fileId}/metrics`, { metrics: toMetrics(item, state.extendedUnsupported) });
+            await api(config, 'POST', `/api/documents/${engineId}/metrics`, { metrics: toMetrics(item, state.extendedUnsupported) });
             return;
         } catch (err) {
             if (err.status === 404) {
                 // file deleted on the engine side: we recreate one for this document
-                delete state.files[item.documentId];
-                await chrome.storage.local.set({ files: state.files });
+                delete state.engineIds[item.documentId];
+                await chrome.storage.local.set({ engineIds: state.engineIds });
             } else if (err.status === 400 && err.code === 'metric_type_unknown' && !state.extendedUnsupported) {
                 // Only this code means the engine is older than the extended metrics. Any other
                 // 400 (an invalid period, a malformed body) used to latch this flag too, and the
@@ -230,19 +230,19 @@ async function pushItem(config, state, item) {
 
 // Engine file associated with a document (null if not yet created or deleted on the engine side).
 async function docInfo(documentId) {
-    const { files } = await getState();
-    const fileId = files[documentId];
-    if (!fileId) return { fileId: null, file: null };
+    const { engineIds } = await getState();
+    const engineId = engineIds[documentId];
+    if (!engineId) return { engineId: null, file: null };
     try {
-        return { fileId, file: await api(await getConfig(), 'GET', `/api/files/${fileId}`) };
+        return { engineId, file: await api(await getConfig(), 'GET', `/api/documents/${engineId}`) };
     } catch (err) {
         if (err.status !== 404) throw err;
         await withLock(async () => {
             const state = await getState();
-            delete state.files[documentId];
-            await chrome.storage.local.set({ files: state.files });
+            delete state.engineIds[documentId];
+            await chrome.storage.local.set({ engineIds: state.engineIds });
         });
-        return { fileId: null, file: null };
+        return { engineId: null, file: null };
     }
 }
 
@@ -291,33 +291,33 @@ function toBase64(buffer) {
     return btoa(binary);
 }
 
-// Sends a document's .docx to its engine file (replaces the already-sent document): the
+// Sends a document's .docx to its engine document (replaces the already-sent document): the
 // content comes from the popup (chosen file, Word Online), otherwise from the Google Docs export.
 async function uploadDocx({ documentId, document }) {
-    const { files } = await getState();
-    const fileId = files[documentId];
-    if (!fileId) throw new HttpError(404, "ce document n'a pas encore de fichier Certimens");
+    const { engineIds } = await getState();
+    const engineId = engineIds[documentId];
+    if (!engineId) throw new HttpError(404, "ce document n'a pas encore de document Certimens");
     if (!document) {
         if (documentId.startsWith('word:')) throw new HttpError(0, 'choisissez le fichier .docx téléchargé depuis Word');
         document = toBase64(await (await exportGoogleDoc(documentId, 'docx')).arrayBuffer());
     }
     if (document.length > MAX_UPLOAD_BASE64) throw new HttpError(413, 'document trop volumineux (18 Mo maximum)');
-    return api(await getConfig(), 'PUT', `/api/files/${fileId}`, { document });
+    return api(await getConfig(), 'PUT', `/api/documents/${engineId}`, { document });
 }
 
 // The engine silently ignores an assignment the student isn't enrolled in: we detect it.
-async function submitFile(fileId, assignmentId) {
-    const file = await api(await getConfig(), 'PUT', `/api/files/${fileId}`, { assignment_id: assignmentId });
+async function submitDocument(engineId, assignmentId) {
+    const file = await api(await getConfig(), 'PUT', `/api/documents/${engineId}`, { assignment_id: assignmentId });
     if (file.assignment_id !== assignmentId) throw new HttpError(403, "vous n'êtes pas rattaché à ce devoir");
     return file;
 }
 
-// Document opened without an engine file: we open the popup (once per document and per browser
+// Document opened without an engine document: we open the popup (once per document and per browser
 // session) so the student creates their file and picks the assignment.
 async function promptUnknownDocument(documentId, tab) {
     const config = await getConfig();
-    const { files, status } = await getState();
-    if (!hasAuth(config) || status.state === 'auth_error' || files[documentId]) return;
+    const { engineIds, status } = await getState();
+    if (!hasAuth(config) || status.state === 'auth_error' || engineIds[documentId]) return;
     const { prompted = [] } = await chrome.storage.session.get('prompted');
     if (prompted.includes(documentId)) return;
     await chrome.storage.session.set({ prompted: [...prompted, documentId] });
@@ -453,7 +453,7 @@ const REQUESTS = {
             language: config.language,
             configured: hasAuth(config),
             queued: state.queue.length,
-            documents: Object.keys(state.files).length,
+            documents: Object.keys(state.engineIds).length,
             status: state.status,
             extendedDropped: state.extendedUnsupported,
             paused: state.paused,
@@ -495,7 +495,7 @@ const REQUESTS = {
         return { file: await uploadDocx(message) };
     },
     async CERTIMENS_SUBMIT_FILE(message) {
-        return { file: await submitFile(message.fileId, message.assignmentId) };
+        return { file: await submitDocument(message.engineId, message.assignmentId) };
     },
     CERTIMENS_CREATE_FILE: (message) => createFileFor(message.documentId, message.documentName, message.editorTitle),
 };

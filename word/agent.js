@@ -1,11 +1,11 @@
 // Certimens — Word add-in, sends to the engine (the counterpart of extension/background.js).
 //
 // Each Word document is tied to a file on the engine (created on the first send via
-// POST /api/files, then remembered). Metrics are sent to POST /api/files/:id/metrics,
+// POST /api/documents, then remembered). Metrics are sent to POST /api/documents/:id/metrics,
 // authenticating with an API token (Bearer), created at login and kept in place of the
 // password. While offline, they stay in a queue
 // (localStorage) resent every minute and when the network comes back. The engine allows the
-// add-in's origin via CORS (internal/api/server.go, wordAddinOrigins).
+// add-in's origin via CORS.
 
 const RETRY_MS = 60 * 1000;
 const MAX_QUEUE = 5000;
@@ -62,7 +62,7 @@ function hasAuth(config) {
 
 function getState() {
     return {
-        files: load('files', {}),
+        engineIds: load('engineIds', {}),
         // The document's title in Word: the last one seen, and the one last sent to the engine.
         titles: load('titles', {}),
         syncedTitles: load('syncedTitles', {}),
@@ -99,7 +99,7 @@ function setStatus(status) {
 }
 
 // Every read/write of the queue goes through this lock: a send and a new measurement
-// never step on each other (nor create two files for the same document).
+// never step on each other (nor create two documents for the same one).
 let lock = Promise.resolve();
 function withLock(fn) {
     const run = lock.then(fn, fn);
@@ -256,14 +256,14 @@ async function createApiToken(engineUrl, email, password) {
 }
 
 
-// Creates the document's engine file if needed. editorTitle is the document's name in Word at
+// Creates the document's engine document if needed. editorTitle is the document's name in Word at
 // that moment: it serves as the reference for detecting a later rename, even if the file was
 // given a different name in the task pane.
-async function ensureFile(config, files, item, editorTitle = item.documentName) {
-    if (files[item.documentId]) return files[item.documentId];
-    const file = await api(config, 'POST', '/api/files', { document_name: item.documentName });
-    files[item.documentId] = file.id;
-    saveEntry('files', item.documentId, file.id);
+async function ensureDocument(config, engineIds, item, editorTitle = item.documentName) {
+    if (engineIds[item.documentId]) return engineIds[item.documentId];
+    const file = await api(config, 'POST', '/api/documents', { name: item.documentName });
+    engineIds[item.documentId] = file.id;
+    saveEntry('engineIds', item.documentId, file.id);
     saveEntry('syncedTitles', item.documentId, editorTitle);
     return file.id;
 }
@@ -272,10 +272,10 @@ async function ensureFile(config, files, item, editorTitle = item.documentName) 
 // pane is kept as long as the document's name does not change.
 async function syncTitles(config, state) {
     for (const [docId, title] of Object.entries(state.titles)) {
-        const fileId = state.files[docId];
-        if (!fileId || state.syncedTitles[docId] === title) continue;
+        const engineId = state.engineIds[docId];
+        if (!engineId || state.syncedTitles[docId] === title) continue;
         try {
-            await api(config, 'PUT', `/api/files/${fileId}`, { document_name: title });
+            await api(config, 'PUT', `/api/documents/${engineId}`, { name: title });
         } catch (err) {
             if (err.status !== 404) throw err; // 404: file deleted, recreated on the next send
         }
@@ -310,26 +310,26 @@ async function logout() {
     setStatus({ state: 'unconfigured' });
 }
 
-// Explicit creation (from the task pane) of a document's engine file; a no-op if it already exists.
+// Explicit creation (from the task pane) of a document's engine document; a no-op if it already exists.
 function createFileFor(docId, name, editorTitle) {
     return withLock(async () => {
-        const { files } = getState();
-        const existed = !!files[docId];
-        const fileId = await ensureFile(getConfig(), files, { documentId: docId, documentName: name }, editorTitle || name);
-        return { fileId, existed };
+        const { engineIds } = getState();
+        const existed = !!engineIds[docId];
+        const engineId = await ensureDocument(getConfig(), engineIds, { documentId: docId, documentName: name }, editorTitle || name);
+        return { engineId, existed };
     });
 }
 
 // Engine file linked to a document (null if not yet created or deleted on the engine side).
 async function docInfo(docId) {
-    const fileId = getState().files[docId];
-    if (!fileId) return { fileId: null, file: null };
+    const engineId = getState().engineIds[docId];
+    if (!engineId) return { engineId: null, file: null };
     try {
-        return { fileId, file: await api(getConfig(), 'GET', `/api/files/${fileId}`) };
+        return { engineId, file: await api(getConfig(), 'GET', `/api/documents/${engineId}`) };
     } catch (err) {
         if (err.status !== 404) throw err;
-        saveEntry('files', docId, undefined);
-        return { fileId: null, file: null };
+        saveEntry('engineIds', docId, undefined);
+        return { engineId: null, file: null };
     }
 }
 
@@ -342,18 +342,18 @@ async function listAssignments() {
     return api(config, 'GET', '/api/assignments');
 }
 
-// Sends the open document's .docx to its engine file (replaces the document already sent).
+// Sends the open document's .docx to its engine document (replaces the document already sent).
 async function uploadDocx(docId) {
-    const fileId = getState().files[docId];
-    if (!fileId) throw new HttpError(404, "créez d'abord le fichier Certimens");
+    const engineId = getState().engineIds[docId];
+    if (!engineId) throw new HttpError(404, "créez d'abord le document Certimens");
     const document = await readDocx();
     if (document.length > MAX_UPLOAD_BASE64) throw new HttpError(413, 'document trop volumineux (18 Mo maximum)');
-    return api(getConfig(), 'PUT', `/api/files/${fileId}`, { document });
+    return api(getConfig(), 'PUT', `/api/documents/${engineId}`, { document });
 }
 
 // The engine silently ignores an assignment the student is not enrolled in: we detect it.
-async function submitFile(fileId, assignmentId) {
-    const file = await api(getConfig(), 'PUT', `/api/files/${fileId}`, { assignment_id: assignmentId });
+async function submitDocument(engineId, assignmentId) {
+    const file = await api(getConfig(), 'PUT', `/api/documents/${engineId}`, { assignment_id: assignmentId });
     if (file.assignment_id !== assignmentId) throw new HttpError(403, "vous n'êtes pas rattaché à ce devoir");
     return file;
 }
@@ -373,15 +373,15 @@ function toMetrics(item, dropExtended) {
 
 async function pushItem(config, state, item) {
     for (let attempt = 0; attempt < 3; attempt++) {
-        const fileId = await ensureFile(config, state.files, item);
+        const engineId = await ensureDocument(config, state.engineIds, item);
         try {
-            await api(config, 'POST', `/api/files/${fileId}/metrics`, { metrics: toMetrics(item, state.extendedUnsupported) });
+            await api(config, 'POST', `/api/documents/${engineId}/metrics`, { metrics: toMetrics(item, state.extendedUnsupported) });
             return;
         } catch (err) {
             if (err.status === 404) {
                 // file deleted on the engine side: we recreate one for this document
-                delete state.files[item.documentId];
-                saveEntry('files', item.documentId, undefined);
+                delete state.engineIds[item.documentId];
+                saveEntry('engineIds', item.documentId, undefined);
             } else if (err.status === 400 && err.code === 'metric_type_unknown' && !state.extendedUnsupported) {
                 // Only this code means the engine predates the extended metrics; any other 400
                 // (an invalid period, a malformed body) must not silence them for good.

@@ -9,13 +9,15 @@
 @font-face { font-family: 'Plus Jakarta Sans'; font-weight: 800; font-display: swap; src: url('fonts/plus-jakarta-sans-latin-800-normal.woff2') format('woff2'); }
 
 :root {
-    /* Slate: the dominant color, and what the actions are made of. */
+    /* Slate: the dominant color, and what every outlined control is made of. */
     --primary: #1e293b;
     --primary-dark: #0f172a;
     --primary-soft: rgba(30, 41, 59, 0.08);
-    /* Brass gold: the single accent, for the word mark and highlights. It is never text on white
-       (~2.3:1); where it has to read as text — the links — the dark brass is used (~5.7:1). */
+    /* Brass gold: the single accent — the word mark, highlights, and the one filled button a
+       view is allowed. It is never text on white (2.46:1); where it has to read as text — the
+       links — the dark brass is used (6.27:1). As a surface it carries ink (6.64:1). */
     --accent: #c5a059;
+    --accent-hover: #d4ac5f;
     --accent-text: #705e3a;
     --bg: #f8fafc;
     --paper: #fff;
@@ -86,6 +88,11 @@ p { margin: 0; }
 .field input:hover, .field select:hover { border-color: var(--text); }
 .field input:focus, .field select:focus { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
 
+/* A filled button is the call to action, and the brand's call to action is a gold surface with
+   ink text — the rule the whole product shares (see the charter in the `website` repo). One per
+   view, the action the view exists for: the popup shows the login submit or the document action,
+   never both. Everything else is .btn.outlined, in slate, because gold outside a surface is
+   2.46:1 on white. */
 .btn {
     display: inline-flex;
     align-items: center;
@@ -95,14 +102,14 @@ p { margin: 0; }
     font: inherit;
     font-size: 15px;
     font-weight: 700;
-    color: #fff;
-    background: var(--primary);
+    color: var(--text);
+    background: var(--accent);
     border: 0;
     border-radius: var(--radius);
     cursor: pointer;
     text-decoration: none;
 }
-.btn:hover { background: var(--primary-dark); }
+.btn:hover { background: var(--accent-hover); }
 .btn:disabled { color: rgba(0, 0, 0, 0.26); background: rgba(0, 0, 0, 0.12); cursor: default; }
 .btn.block { width: 100%; }
 label.btn.disabled { opacity: 0.5; pointer-events: none; }

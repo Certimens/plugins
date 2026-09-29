@@ -53,14 +53,14 @@ class FakeEngine(BaseHTTPRequestHandler):
             return self._reply(204)
         if self.path.startswith('/api/auth/tokens/') and self.command == 'DELETE':
             return self._reply(204)
-        if self.path == '/api/files' and self.command == 'POST':
+        if self.path == '/api/documents' and self.command == 'POST':
             FakeEngine.next_file += 1
-            return self._reply(201, {'id': f'f{FakeEngine.next_file}', 'document_name': body['document_name']})
+            return self._reply(201, {'id': f'f{FakeEngine.next_file}', 'name': body['name']})
         if self.path.endswith('/metrics'):
             if FakeEngine.metrics_error:
                 return self._reply(400, FakeEngine.metrics_error)
             return self._reply(201)
-        if self.path.startswith('/api/files/') and self.command == 'PUT':
+        if self.path.startswith('/api/documents/') and self.command == 'PUT':
             return self._reply(200, {'id': self.path.rsplit('/', 1)[-1], **body})
         return self._reply(404, {'error': 'not found'})
 
@@ -101,7 +101,7 @@ class EngineTest(unittest.TestCase):
         FakeEngine.calls = []
         restarted.drain()
         self.assertEqual(restarted.status(), ({**restarted.status()[0], 'state': 'synced'}, 0))
-        created = [c for c in FakeEngine.calls if c[:2] == ('POST', '/api/files')]
+        created = [c for c in FakeEngine.calls if c[:2] == ('POST', '/api/documents')]
         self.assertEqual(len(created), 1)
         metrics = [c for c in FakeEngine.calls if c[1].endswith('/metrics')][-1][2]['metrics']
         self.assertEqual(metrics, [{'type': 'total_keystrokes', 'value': 5,
@@ -135,7 +135,7 @@ class EngineTest(unittest.TestCase):
         self.engine.note_title('doc1', 'Mémoire final')
         self.engine.drain()
         self.engine.drain()
-        renames = [c for c in FakeEngine.calls if c[0] == 'PUT' and c[2] == {'document_name': 'Mémoire final'}]
+        renames = [c for c in FakeEngine.calls if c[0] == 'PUT' and c[2] == {'name': 'Mémoire final'}]
         self.assertEqual(len(renames), 1)
 
     def test_unknown_metric_type_drops_the_extended_metrics(self):
@@ -165,10 +165,10 @@ class EngineTest(unittest.TestCase):
 
     def test_upload_sends_the_docx_in_base64(self):
         self.engine.login(self.url, 'a@b.fr', 'secret')
-        file_id, _ = self.engine.create_file('doc1', 'Mémoire', 'Mémoire')
+        engine_id, _ = self.engine.create_file('doc1', 'Mémoire', 'Mémoire')
         self.engine.upload_docx('doc1', b'PK\x03\x04docx')
         method, path, body, _ = FakeEngine.calls[-1]
-        self.assertEqual((method, path), ('PUT', f'/api/files/{file_id}'))
+        self.assertEqual((method, path), ('PUT', f'/api/documents/{engine_id}'))
         self.assertEqual(base64.b64decode(body['document']), b'PK\x03\x04docx')
 
     def test_upload_without_file_is_refused(self):

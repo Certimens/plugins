@@ -33,7 +33,7 @@ class DictionaryTest(unittest.TestCase):
                              '%s : les variables diffèrent' % key)
 
     def test_engine_rule(self):
-        """« en » donne l'anglais, tout le reste le français (domain.NormalizeLanguage)."""
+        """« en » donne l'anglais, tout le reste le français : la règle du moteur."""
         for tag in ('en', 'en-GB', 'EN-us'):
             self.assertEqual(i18n.normalize_language(tag), 'en')
         for tag in ('fr-FR', 'es-ES', '', None):

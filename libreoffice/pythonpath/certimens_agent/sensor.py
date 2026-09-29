@@ -65,7 +65,7 @@ def is_writer(component):
 
 def document_id(doc, create):
     """Stable identifier of the document, stored in its custom properties (it follows the
-    file, .odt as well as .docx). Created on the first keystroke, or when the engine file is created."""
+    file, .odt as well as .docx). Created on the first keystroke, or when the engine document is created."""
     props = doc.getDocumentProperties().getUserDefinedProperties()
     if props.getPropertySetInfo().hasPropertyByName(DOCUMENT_ID_PROPERTY):
         return props.getPropertyValue(DOCUMENT_ID_PROPERTY)
@@ -160,9 +160,9 @@ class DocumentSensor:
             pass
 
     def prompt_unlinked(self, controller):
-        """Document with no Certimens file: an info bar offers to link it (once
+        """Document with no Certimens document: an info bar offers to link it (once
         per document and per session, LibreOffice 7.0+)."""
-        if self.prompted or not self.engine.logged_in() or (self.doc_id and self.engine.file_id(self.doc_id)):
+        if self.prompted or not self.engine.logged_in() or (self.doc_id and self.engine.engine_id(self.doc_id)):
             return
         self.prompted = True
         try:
@@ -173,7 +173,7 @@ class DocumentSensor:
             pass  # LibreOffice too old
 
     def clear_infobar(self):
-        """Removes the info bar once the document has its Certimens file (the window calls this
+        """Removes the info bar once the document has its Certimens document (the window calls this
         right after creating it)."""
         for view in self.views:
             try:

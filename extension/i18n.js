@@ -1,7 +1,7 @@
 // Certimens — interface languages, shared by the browser extension and the Word add-in (which
 // loads this file from the extension, like ui.css and ui.js).
 //
-// Two languages, one rule, the engine's own (internal/user/domain.NormalizeLanguage): a tag that
+// Two languages, one rule, the engine's own: a tag that
 // starts with "en" gives English, everything else gives French. French is the default because
 // the product is sold to French higher education — an unknown locale lands there rather than in
 // a language the student's school does not use.
@@ -41,15 +41,15 @@ const MESSAGES = {
         'error.authRefused': 'Identifiants refusés : reconnectez-vous.',
 
         'doc.open': 'Document ouvert',
-        'doc.linked': 'Fichier Certimens associé : les mesures y sont envoyées.',
+        'doc.linked': 'Document Certimens associé : les mesures y sont envoyées.',
         'doc.submittedTo': 'Rendu sur : {title}',
         'doc.submittedGeneric': 'Rendu sur un devoir',
         'doc.openInCertimens': 'Ouvrir dans Certimens',
-        'doc.name': 'Nom du fichier',
-        'doc.create': 'Créer le fichier',
+        'doc.name': 'Nom du document',
+        'doc.create': 'Créer le document',
         'doc.submit': 'Rendre sur ce devoir',
         'doc.changeAssignment': 'Changer de devoir',
-        'doc.none': 'Ouvrez un document Google Docs ou Word Online pour créer son fichier Certimens.',
+        'doc.none': 'Ouvrez un document Google Docs ou Word Online pour créer son document Certimens.',
         'doc.alreadyUploaded': 'Un document est déjà envoyé : un nouvel envoi le remplace.',
         'doc.wordSaveHint': 'Dans Word : Fichier › Enregistrer sous › Télécharger une copie, puis choisissez ce fichier.',
 
@@ -60,10 +60,10 @@ const MESSAGES = {
         'assignment.overdue': '{title} (échu le {date})',
 
         'submit.refused': 'Rendu impossible : {message}.',
-        'submit.done': 'Fichier rendu.',
-        'create.existed': 'Ce document avait déjà un fichier.',
-        'create.created': 'Fichier créé.',
-        'create.createdAndSubmitted': 'Fichier créé et rendu.',
+        'submit.done': 'Document rendu.',
+        'create.existed': 'Ce document était déjà enregistré.',
+        'create.created': 'Document créé.',
+        'create.createdAndSubmitted': 'Document créé et rendu.',
 
         'upload.sendDocx': 'Envoyer le .docx',
         'upload.pickDocx': 'Envoyer un .docx…',
@@ -158,15 +158,15 @@ const MESSAGES = {
         'error.authRefused': 'Credentials refused: log in again.',
 
         'doc.open': 'Open document',
-        'doc.linked': 'Linked to a Certimens file: measurements are sent to it.',
+        'doc.linked': 'Linked to a Certimens document: measurements are sent to it.',
         'doc.submittedTo': 'Submitted to: {title}',
         'doc.submittedGeneric': 'Submitted to an assignment',
         'doc.openInCertimens': 'Open in Certimens',
-        'doc.name': 'File name',
-        'doc.create': 'Create the file',
+        'doc.name': 'Document name',
+        'doc.create': 'Create the document',
         'doc.submit': 'Submit to this assignment',
         'doc.changeAssignment': 'Change assignment',
-        'doc.none': 'Open a Google Docs or Word Online document to create its Certimens file.',
+        'doc.none': 'Open a Google Docs or Word Online document to create its Certimens document.',
         'doc.alreadyUploaded': 'A document has already been sent: sending another replaces it.',
         'doc.wordSaveHint': 'In Word: File › Save As › Download a copy, then pick that file.',
 
@@ -177,10 +177,10 @@ const MESSAGES = {
         'assignment.overdue': '{title} (overdue since {date})',
 
         'submit.refused': 'Submission refused: {message}.',
-        'submit.done': 'File submitted.',
-        'create.existed': 'This document already had a file.',
-        'create.created': 'File created.',
-        'create.createdAndSubmitted': 'File created and submitted.',
+        'submit.done': 'Document submitted.',
+        'create.existed': 'This document was already registered.',
+        'create.created': 'Document created.',
+        'create.createdAndSubmitted': 'Document created and submitted.',
 
         'upload.sendDocx': 'Send the .docx',
         'upload.pickDocx': 'Send a .docx…',
