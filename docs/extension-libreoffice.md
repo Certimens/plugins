@@ -26,7 +26,11 @@ coordonnées, donc une sélection tracée à la souris n'y est pas détectable
   - `dialogs.py` : les fenêtres du menu **Certimens** (l'équivalent de la popup de l'extension),
     construites contrôle par contrôle faute de HTML : connexion, puis document Certimens du
     document, devoir et envoi du .docx. Les appels au moteur partent d'un fil dédié — sinon
-    LibreOffice resterait figé le temps de la réponse.
+    LibreOffice resterait figé le temps de la réponse ;
+  - `i18n.py` : les deux dictionnaires d'interface ([langues.md](langues.md)) ;
+  - `log.py` : `warn()`, ce que l'agent dit quand il rattrape une erreur. LibreOffice ne donne
+    pas de console à une extension : le message part par `logging`, vers le terminal d'où
+    LibreOffice a été lancé, et jamais avec ce que l'étudiant a écrit.
 - `tests/` : `npm run test:libreoffice`, sans LibreOffice.
 
 Chaque document garde son identifiant dans ses **propriétés personnalisées** (il suit le

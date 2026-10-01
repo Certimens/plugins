@@ -155,7 +155,7 @@ function readDocx() {
     return new Promise((resolve, reject) => {
         Office.context.document.getFileAsync(Office.FileType.Compressed, { sliceSize: DOCX_SLICE_BYTES }, (result) => {
             if (result.status !== Office.AsyncResultStatus.Succeeded) {
-                reject(new HttpError(0, `lecture du document impossible (${result.error.message})`));
+                reject(new HttpError(0, t('error.docRead', { message: result.error.message })));
                 return;
             }
             const file = result.value;
@@ -169,7 +169,7 @@ function readDocx() {
                 file.getSliceAsync(index, (slice) => {
                     if (slice.status !== Office.AsyncResultStatus.Succeeded) {
                         file.closeAsync();
-                        reject(new HttpError(0, `lecture du document impossible (${slice.error.message})`));
+                        reject(new HttpError(0, t('error.docRead', { message: slice.error.message })));
                         return;
                     }
                     chunks.push(slice.value.data);
@@ -218,7 +218,7 @@ async function request(url, init) {
     try {
         return await fetch(url, init);
     } catch (err) {
-        throw new HttpError(0, err.message || 'erreur réseau');
+        throw new HttpError(0, err.message || t('error.networkError'));
     }
 }
 
@@ -345,23 +345,23 @@ async function listAssignments() {
 // Sends the open document's .docx to its engine document (replaces the document already sent).
 async function uploadDocx(docId) {
     const engineId = getState().engineIds[docId];
-    if (!engineId) throw new HttpError(404, "créez d'abord le document Certimens");
+    if (!engineId) throw new HttpError(404, t('error.noFile'));
     const document = await readDocx();
-    if (document.length > MAX_UPLOAD_BASE64) throw new HttpError(413, 'document trop volumineux (18 Mo maximum)');
+    if (document.length > MAX_UPLOAD_BASE64) throw new HttpError(413, t('error.tooLarge'));
     return api(getConfig(), 'PUT', `/api/documents/${engineId}`, { document });
 }
 
 // The engine silently ignores an assignment the student is not enrolled in: we detect it.
 async function submitDocument(engineId, assignmentId) {
     const file = await api(getConfig(), 'PUT', `/api/documents/${engineId}`, { assignment_id: assignmentId });
-    if (file.assignment_id !== assignmentId) throw new HttpError(403, "vous n'êtes pas rattaché à ce devoir");
+    if (file.assignment_id !== assignmentId) throw new HttpError(403, t('error.notEnrolled'));
     return file;
 }
 
 // --- 4. QUEUE ---
 function failureStatus(err) {
     return err.status === 401
-        ? { state: 'auth_error', message: 'Identifiants refusés par le moteur.' }
+        ? { state: 'auth_error', message: t('sync.auth_error') }
         : { state: 'offline', message: err.message };
 }
 
@@ -407,16 +407,10 @@ function dequeue(id) {
 
 function drain() {
     return withLock(async () => {
+        const config = getConfig();
         const state = getState();
-        if (!hasAuth(getConfig())) {
+        if (!hasAuth(config)) {
             setStatus({ state: 'unconfigured' });
-            return;
-        }
-        let config;
-        try {
-            config = getConfig();
-        } catch (err) {
-            setStatus(failureStatus(err));
             return;
         }
         while (state.queue.length > 0) {

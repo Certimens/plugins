@@ -127,6 +127,13 @@ class Measure:
     # --- events ---
     def on_key(self, now, category, ctrl=False, letter=None, shift=False):
         """Key pressed (excluding auto-repeat). letter: 's', 'x', 'z'… with Ctrl/Cmd."""
+        # A modifier pressed on its own is not a keystroke: it writes nothing, and the near-zero
+        # gap it leaves before the character it modifies would pass for an impossibly fast one.
+        # extension/content.js drops it the same way; Word and VS Code, counting characters,
+        # never see one. Dropped before anything else, so a Shift pressed between a click and a
+        # Backspace no longer spends the click either.
+        if category == MODIFIER:
+            return None
         w = self.window
         self._mark(now)
         self._pause(now)
@@ -164,7 +171,7 @@ class Measure:
             # A navigation without Shift collapses the selection instead of extending it.
             if not shift:
                 self.selection_scope = None
-        elif category != MODIFIER:
+        else:
             # A character typed over a selection replaces it. Ctrl shortcuts act on the selection
             # (copy, select-all) rather than replacing it, so they are excluded.
             if not ctrl:

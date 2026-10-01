@@ -12,7 +12,9 @@ de l'extension : connexion, document Certimens du document, rendu sur un devoir,
   la différence avec la lecture précédente dit ce qui a été inséré ou effacé. Les modifications
   des co-auteurs sont ignorées. Mêmes metrics que l'extension, sauf `mad_ms`, `median_flight_ms`
   et `focus_losses` (voir *Écarts assumés* dans [mesures.md](mesures.md)). Une « frappe » y est
-  un caractère inséré ou effacé ; le détail est en tête du fichier.
+  un caractère inséré ou effacé ; le détail est en tête du fichier. Office ne signalant ni
+  l'enregistrement ni la sortie du document, ses fenêtres partent sur l'inactivité, sur les
+  200 frappes et à la fermeture du volet.
 - `agent.js` : l'équivalent de `background.js` (file hors-ligne dans `localStorage`, renvoyée
   chaque minute). Chaque document garde son identifiant dans ses réglages, il suit donc le .docx.
 - `taskpane.html` / `taskpane.js` : le volet. Il reste chargé volet fermé (runtime partagé) ;
@@ -21,7 +23,9 @@ de l'extension : connexion, document Certimens du document, rendu sur un devoir,
   `taskpane.html`), mais GitHub Pages ne sert aucun listing de dossier : sans elle, l'adresse du
   site répond 404 alors que tous les fichiers sont bien là. Le build y injecte la version.
 
-Le build reprend `ui.css`, `ui.js`, les polices et les icônes de `extension/`.
+Le build reprend de `extension/` la feuille de style `ui.css`, le code partagé des deux volets
+`ui.js`, le dictionnaire `i18n.js` ([langues.md](langues.md)), les polices et les icônes : le
+volet Word et la popup sont le même écran, ils n'ont pas deux jeux de textes.
 
 ## Hébergement
 
@@ -74,13 +78,13 @@ recharger côté Word** : fermer et rouvrir le volet suffit. Deux réserves :
 L'adresse du site sert `index.html`, et chaque fichier se teste directement, sans Word :
 
 ```bash
-for f in manifest.xml taskpane.html taskpane.js agent.js sensor.js ui.css ui.js; do
+for f in manifest.xml taskpane.html taskpane.js agent.js sensor.js ui.css ui.js i18n.js; do
   curl -s -o /dev/null -w "%{http_code} $f\n" "https://certimens.github.io/plugins/word/$f"
 done
 curl -s https://certimens.github.io/plugins/word/manifest.xml | grep -E '<Version>|SourceLocation'
 ```
 
-Sept `200` et la version attendue dans le manifest : le site est bon. Un `404` **sur tous** les
+Huit `200` et la version attendue dans le manifest : le site est bon. Un `404` **sur tous** les
 fichiers veut dire que Pages n'est pas activé (*Settings › Pages › Source : GitHub Actions*) ou
 qu'aucun déploiement n'a eu lieu ; un `404` sur un seul fichier vient du build.
 

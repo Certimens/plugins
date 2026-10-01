@@ -50,6 +50,10 @@ ne pas les réunifier.
   tracé souris, Maj+déplacement). Maj seule ne sélectionne rien ; un déplacement sans Maj ou un
   clic annule la sélection ; elle n'est décomptée qu'une fois.
 - **La répétition automatique ne compte pas** : Suppr maintenue = une suppression.
+- **Une touche de modification seule n'est pas une frappe.** Maj, Ctrl, Alt, AltGr pressée pour
+  elle-même n'ouvre pas de fenêtre, ne compte pas, n'entre pas dans les flight times et ne solde
+  pas le déplacement qui la précède. Elle est écartée **avant tout le reste** dans `onKeyDown` et
+  dans `Measure.on_key` ; Word et VS Code, qui comptent des caractères, n'en voient jamais.
 - La période d'une fenêtre va de la première à la dernière activité : le temps mort n'y entre
   jamais.
 

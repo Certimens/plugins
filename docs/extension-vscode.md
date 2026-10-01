@@ -19,6 +19,8 @@ corrige, ce sont des fichiers, pas un projet en bloc.
   par document, la barre d'état et les commandes.
 - `panel.js` : le panneau latéral (webview), le même écran que la popup de l'extension et que le
   volet Word ; il réutilise `ui.css`, ne détient aucun état et ne voit jamais le jeton.
+- `i18n.js` : les deux dictionnaires d'interface, plus ceux qui n'ont de sens que dans un éditeur
+  — `bar.*` pour la barre d'état, `notify.*` pour les notifications ([langues.md](langues.md)).
 - `README.md` : la fiche du Marketplace, écrite pour l'étudiant. Le build la copie dans le
   paquet ; la documentation de référence, elle, reste ici.
 

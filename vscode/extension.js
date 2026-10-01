@@ -179,7 +179,7 @@ class Agent {
     // Its documentId still carries the old path, which is what ties the two together — renaming
     // the id instead would orphan every window already queued under it.
     onRename(event) {
-        for (const { oldUri, newUri } of event.engineIds) {
+        for (const { oldUri, newUri } of event.files) {
             const sensor = this.sensors.get(oldUri.toString());
             if (sensor) {
                 sensor.flush('rename');
@@ -374,7 +374,7 @@ function activate(context) {
         })),
         vscode.commands.registerCommand('certimens.focusPanel', run(() => vscode.commands.executeCommand(`${CertimensPanel.viewType}.focus`))),
         vscode.commands.registerCommand('certimens.flush', run(async () => {
-            agent.flushAll('manuel');
+            agent.flushAll('manual');
             await agent.engine.drain();
         })),
     );

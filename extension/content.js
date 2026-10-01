@@ -209,6 +209,13 @@ function consumeSelection() {
 // --- 2. CAPTURE ---
 function onKeyDown(e) {
     if (paused || e.repeat || !e.isTrusted) return;
+    // A modifier pressed on its own is not a keystroke: it writes nothing, and the near-zero gap
+    // it leaves before the character it modifies would pass for an impossibly fast one — which is
+    // exactly what mad_ms and median_flight_ms are meant to tell apart. Word and VS Code, which
+    // count characters, never see one; counting them here made the same student look faster and
+    // more prolific in the browser than in an editor. It is dropped before anything else, so a
+    // Shift pressed between a click and a Backspace no longer spends the click either.
+    if (MODIFIER_KEYS.has(e.key)) return;
     const now = Date.now();
     markActivity(now);
     trackPause(now);
@@ -250,7 +257,7 @@ function onKeyDown(e) {
         isNavigating = true;
         // A navigation without Shift collapses the selection instead of extending it.
         if (!e.shiftKey) selectionScope = null;
-    } else if (!MODIFIER_KEYS.has(key)) {
+    } else {
         // A character typed over a selection replaces it. Ctrl/Cmd shortcuts are excluded: they
         // act on the selection (copy, select-all) rather than replacing it — Ctrl+X and Ctrl+V
         // are accounted for on their own below and in the paste handler.

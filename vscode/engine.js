@@ -214,7 +214,7 @@ class Engine {
             const engineId = state.engineIds[documentId];
             if (!engineId || state.syncedNames[documentId] === name) continue;
             try {
-                await this.api('PUT', `/api/documents/${engineId}`, { name: name });
+                await this.api('PUT', `/api/documents/${engineId}`, { name });
             } catch (err) {
                 if (err.status !== 404) throw err; // 404: file deleted, recreated on the next send
             }

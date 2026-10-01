@@ -18,6 +18,7 @@ import uuid
 from datetime import datetime, timezone
 
 from .i18n import set_language, t
+from .log import warn
 
 DEFAULT_ENGINE_URL = 'https://monespace.certimens.fr'
 RETRY_S = 60
@@ -41,6 +42,10 @@ class HttpError(Exception):
 
 def iso(timestamp):
     return datetime.fromtimestamp(timestamp, timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
 
 
 def trim_url(url):
@@ -121,7 +126,7 @@ class Engine:
 
     def _set_status(self, status):
         with self.lock:
-            self.state['status'] = {**status, 'at': iso(datetime.now().timestamp())}
+            self.state['status'] = {**status, 'at': now_iso()}
             self._save()
         for listener in list(self.listeners):
             listener()
@@ -243,17 +248,17 @@ class Engine:
         """The engine silently ignores an assignment the student is not attached to."""
         file = self.api('PUT', f'/api/documents/{engine_id}', {'assignment_id': assignment_id})
         if file.get('assignment_id') != assignment_id:
-            raise HttpError(403, "vous n'êtes pas rattaché à ce devoir")
+            raise HttpError(403, t('error.notEnrolled'))
         return file
 
     def upload_docx(self, document_id, docx_bytes):
         """Sends the .docx to the engine document (replaces the document already sent)."""
         engine_id = self.engine_id(document_id)
         if not engine_id:
-            raise HttpError(404, "créez d'abord le document Certimens")
+            raise HttpError(404, t('error.noFile'))
         document = base64.b64encode(docx_bytes).decode('ascii')
         if len(document) > MAX_UPLOAD_BASE64:
-            raise HttpError(413, 'document trop volumineux (18 Mo maximum)')
+            raise HttpError(413, t('error.tooLarge'))
         return self.api('PUT', f'/api/documents/{engine_id}', {'document': document})
 
     def note_title(self, document_id, title):
@@ -281,9 +286,12 @@ class Engine:
     def _push(self, config, item):
         for _ in range(3):
             engine_id = self._ensure_document(config, item['documentId'], item['documentName'])
-            drop = self.state['extendedUnsupported']
-            metrics = [{'type': t, 'value': v, 'period': item['period']}
-                       for t, v in item['values'].items() if not (drop and t in EXTENDED_TYPES)]
+            with self.lock:
+                drop = self.state['extendedUnsupported']
+            # `t` is the translator: the metric type gets its own name here, and in _sync_titles.
+            metrics = [{'type': metric, 'value': value, 'period': item['period']}
+                       for metric, value in item['values'].items()
+                       if not (drop and metric in EXTENDED_TYPES)]
             try:
                 self.api('POST', f'/api/documents/{engine_id}/metrics', {'metrics': metrics}, config)
                 return
@@ -305,8 +313,10 @@ class Engine:
     def _sync_titles(self, config):
         """Propagates renamed documents (saved under a different name) to the engine."""
         with self.lock:
-            pending = [(d, t, self.state['engineIds'][d]) for d, t in self.state['titles'].items()
-                       if d in self.state['engineIds'] and self.state['syncedTitles'].get(d) != t]
+            pending = [(document_id, title, self.state['engineIds'][document_id])
+                       for document_id, title in self.state['titles'].items()
+                       if document_id in self.state['engineIds']
+                       and self.state['syncedTitles'].get(document_id) != title]
         for document_id, title, engine_id in pending:
             try:
                 self.api('PUT', f'/api/documents/{engine_id}', {'name': title}, config)
@@ -334,13 +344,13 @@ class Engine:
                     if err.status != 400:
                         raise
                     # metric rejected by the engine: resending it would block the queue forever
-                    print('Certimens: mesure rejetée', err.message)
+                    warn('mesure rejetée', err.message)
                 with self.lock:
                     self.state['queue'] = [q for q in self.state['queue'] if q['id'] != item['id']]
                     self._save()
             self._sync_titles(config)
         except HttpError as err:
-            self._set_status({'state': 'auth_error', 'message': 'Identifiants refusés par le moteur.'}
+            self._set_status({'state': 'auth_error', 'message': t('sync.auth_error')}
                              if err.status == 401 else {'state': 'offline', 'message': err.message})
             return
         self._set_status({'state': 'synced'})
@@ -352,7 +362,7 @@ class Engine:
             try:
                 self.drain()
             except Exception as err:  # the sending thread must never stop
-                print('Certimens:', err)
+                warn('envoi interrompu', err)
 
     def start(self):
         threading.Thread(target=self._run, name='certimens-engine', daemon=True).start()

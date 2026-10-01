@@ -39,10 +39,13 @@ const MESSAGES = {
         'error.noEditor': 'ouvrez le fichier à rendre',
         'error.notMeasured': "ce fichier n'est pas mesuré (hors projet, ou exclu)",
         'error.noToken': 'aucun jeton : connectez-vous à Certimens',
-        'error.noFile': "ce fichier n'a pas encore de document Certimens",
-        'error.tooLarge': 'fichier trop volumineux (18 Mo maximum)',
+        // Shared word for word with extension/i18n.js: the same refusal must read the same from
+        // one agent to the next (tests/i18n.test.mjs holds the two dictionaries to it).
+        'error.noFile': "créez d'abord son document Certimens",
+        'error.tooLarge': 'document trop volumineux (18 Mo maximum)',
         'error.notEnrolled': "vous n'êtes pas rattaché à ce devoir",
         'error.networkError': 'erreur réseau',
+        'error.engineUnreachable': 'Moteur injoignable ({message}).',
 
         // bar.* is the status bar and notify.* the toasts: both say what the popup and the
         // task pane say, but with the editor's icons and the product's name in front, so they
@@ -61,7 +64,6 @@ const MESSAGES = {
         'panel.authRefused': 'Identifiants refusés — reconnectez-vous.',
         'panel.queued': '{count} mesure en attente d’envoi.',
         'panel.queuedPlural': '{count} mesures en attente d’envoi.',
-        'error.engineUnreachable': 'Moteur injoignable ({message}).',
         'panel.synced': 'Mesures synchronisées.',
         'panel.pausedQueued': '{count} mesure d’avant la pause encore à envoyer.',
         'panel.pausedQueuedPlural': '{count} mesures d’avant la pause encore à envoyer.',
@@ -111,10 +113,11 @@ const MESSAGES = {
         'error.noEditor': 'open the file you want to submit',
         'error.notMeasured': 'this file is not measured (outside the project, or excluded)',
         'error.noToken': 'no token: log in to Certimens',
-        'error.noFile': 'this file has no Certimens document yet',
-        'error.tooLarge': 'file too large (18 MB maximum)',
+        'error.noFile': 'create its Certimens document first',
+        'error.tooLarge': 'document too large (18 MB maximum)',
         'error.notEnrolled': 'you are not enrolled in this assignment',
         'error.networkError': 'network error',
+        'error.engineUnreachable': 'Engine unreachable ({message}).',
 
         'bar.paused': '$(debug-pause) Certimens: measurement paused',
         'bar.pausedTip': 'Measurement is paused. Open the Certimens panel to resume it.',
@@ -130,7 +133,6 @@ const MESSAGES = {
         'panel.authRefused': 'Credentials refused — log in again.',
         'panel.queued': '{count} measurement waiting to be sent.',
         'panel.queuedPlural': '{count} measurements waiting to be sent.',
-        'error.engineUnreachable': 'Engine unreachable ({message}).',
         'panel.synced': 'Measurements synchronised.',
         'panel.pausedQueued': '{count} measurement from before the pause still to send.',
         'panel.pausedQueuedPlural': '{count} measurements from before the pause still to send.',

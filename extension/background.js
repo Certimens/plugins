@@ -259,21 +259,21 @@ async function listAssignments() {
 // Google redirects to googleusercontent.com, readable thanks to the extension's host permissions
 // but not from the page. An expired session returns the login page (HTML).
 async function exportGoogleDoc(documentId, format) {
-    if (!/^[a-zA-Z0-9_-]+$/.test(documentId)) throw new HttpError(0, 'document Google Docs invalide');
+    if (!/^[a-zA-Z0-9_-]+$/.test(documentId)) throw new HttpError(0, t('error.invalidGoogleDoc'));
     // Firefox (and Chrome when site access is restricted) doesn't automatically grant the manifest
     // hosts: without them, the export redirect is blocked by CORS.
     if (!(await chrome.permissions.contains({ origins: GOOGLE_EXPORT_ORIGINS }))) {
-        throw new HttpError(0, "autorisez l'extension à lire les exports Google Docs (bouton « Envoyer le .docx »)");
+        throw new HttpError(0, t('error.exportPermission'));
     }
     let res;
     try {
         res = await fetch(`https://docs.google.com/document/d/${documentId}/export?format=${format}`, { credentials: 'include' });
     } catch (err) {
-        throw new HttpError(0, `export Google Docs bloqué (${err.message})`);
+        throw new HttpError(0, t('error.exportBlocked', { message: err.message }));
     }
-    if (!res.ok) throw new HttpError(0, `export Google Docs refusé (${res.status})`);
+    if (!res.ok) throw new HttpError(0, t('error.exportRefused', { status: res.status }));
     if ((res.headers.get('Content-Type') || '').includes('text/html')) {
-        throw new HttpError(0, 'export Google Docs refusé (session Google expirée ?)');
+        throw new HttpError(0, t('error.exportExpired'));
     }
     return res;
 }
@@ -296,19 +296,19 @@ function toBase64(buffer) {
 async function uploadDocx({ documentId, document }) {
     const { engineIds } = await getState();
     const engineId = engineIds[documentId];
-    if (!engineId) throw new HttpError(404, "ce document n'a pas encore de document Certimens");
+    if (!engineId) throw new HttpError(404, t('error.noFile'));
     if (!document) {
-        if (documentId.startsWith('word:')) throw new HttpError(0, 'choisissez le fichier .docx téléchargé depuis Word');
+        if (documentId.startsWith('word:')) throw new HttpError(0, t('error.pickDocx'));
         document = toBase64(await (await exportGoogleDoc(documentId, 'docx')).arrayBuffer());
     }
-    if (document.length > MAX_UPLOAD_BASE64) throw new HttpError(413, 'document trop volumineux (18 Mo maximum)');
+    if (document.length > MAX_UPLOAD_BASE64) throw new HttpError(413, t('error.tooLarge'));
     return api(await getConfig(), 'PUT', `/api/documents/${engineId}`, { document });
 }
 
 // The engine silently ignores an assignment the student isn't enrolled in: we detect it.
 async function submitDocument(engineId, assignmentId) {
     const file = await api(await getConfig(), 'PUT', `/api/documents/${engineId}`, { assignment_id: assignmentId });
-    if (file.assignment_id !== assignmentId) throw new HttpError(403, "vous n'êtes pas rattaché à ce devoir");
+    if (file.assignment_id !== assignmentId) throw new HttpError(403, t('error.notEnrolled'));
     return file;
 }
 
@@ -334,7 +334,7 @@ async function promptUnknownDocument(documentId, tab) {
 // --- 3. QUEUE ---
 function failureStatus(err) {
     return err.status === 401
-        ? { state: 'auth_error', message: 'Identifiants refusés par le moteur.' }
+        ? { state: 'auth_error', message: t('sync.auth_error') }
         : { state: 'offline', message: err.message };
 }
 
@@ -348,16 +348,9 @@ function enqueue(item) {
 
 function drain() {
     return withLock(async () => {
-        const state = await getState();
-        if (!hasAuth(await getConfig())) {
+        const [config, state] = await Promise.all([getConfig(), getState()]);
+        if (!hasAuth(config)) {
             await setStatus({ state: 'unconfigured' });
-            return;
-        }
-        let config;
-        try {
-            config = await getConfig();
-        } catch (err) {
-            await setStatus(failureStatus(err));
             return;
         }
         while (state.queue.length > 0) {
@@ -516,8 +509,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // async response
 });
 
+// The language every message this worker words is in: the account's, the browser's until the
+// student logs in. Applied on load rather than from init(), because a service worker is woken by
+// an alarm or a message far more often than it is installed or started with the browser — and a
+// worker that skipped this would word its refusals in French for an English account.
+function applyStoredLanguage() {
+    return getConfig().then((config) => setLanguage(config.language, chrome.i18n.getUILanguage()), () => {});
+}
+
 chrome.storage.onChanged.addListener((changes) => {
-    if (changes.config) drain();
+    if (changes.config) applyStoredLanguage().then(drain);
     if (changes.paused) refreshBadge();
 });
 
@@ -526,7 +527,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 function init() {
-    getConfig().then((config) => setLanguage(config.language, chrome.i18n.getUILanguage()), () => {});
     chrome.alarms.create(RETRY_ALARM, { periodInMinutes: 1 });
     drain();
 }
@@ -536,3 +536,5 @@ chrome.runtime.onInstalled.addListener((details) => {
     if (details.reason === 'install') chrome.runtime.openOptionsPage();
 });
 chrome.runtime.onStartup.addListener(init);
+
+applyStoredLanguage();

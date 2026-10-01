@@ -9,6 +9,7 @@
 // posts back what the student clicked. Everything else stays on this side, where the API token
 // is and where the webview cannot reach it.
 
+const crypto = require('node:crypto');
 const vscode = require('vscode');
 
 const { t, plural, currentLanguage } = require('./i18n.js');
@@ -31,11 +32,10 @@ function esc(text) {
     return String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// A CSP nonce is only worth anything if it cannot be guessed: Math.random is a sequence, not a
+// secret.
 function nonce() {
-    let text = '';
-    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 32; i++) text += alphabet[Math.floor(Math.random() * alphabet.length)];
-    return text;
+    return crypto.randomBytes(24).toString('base64url');
 }
 
 // What a status reads as for a student. The engine's own vocabulary ('synced', 'offline') says
@@ -45,9 +45,9 @@ function statusText(status, queued, paused) {
     // The queue keeps draining while paused — what was measured before belongs to the engine
     // already, and holding it back would only turn a pause into a late, suspicious batch.
     if (paused) {
-        // Le bandeau du panneau dit déjà la suspension : cette ligne n'ajoute quelque chose que
-        // s'il reste des mesures d'avant la pause à envoyer. Sinon elle se tait, plutôt que de
-        // répéter le bandeau juste au-dessus.
+        // The panel's banner already says it is suspended: this line only adds something when
+        // measurements from before the pause are still waiting. Otherwise it keeps quiet rather
+        // than repeating the banner right above it.
         return queued > 0
             ? { text: plural('panel.pausedQueued', queued), kind: 'error' }
             : { text: '', kind: '' };
@@ -100,8 +100,8 @@ class CertimensPanel {
         h1 { font-size: 1.35rem; }
         h2 { font-size: 1rem; font-weight: 700; letter-spacing: 0; word-break: break-all; }
         .card { padding: 16px; }
-        .engineIds { max-height: 180px; overflow-y: auto; }
-        .engineIds div { padding: 2px 0; word-break: break-all; }
+        .measured { max-height: 180px; overflow-y: auto; }
+        .measured div { padding: 2px 0; word-break: break-all; }
     </style>
 </head>
 <body class="stack" style="gap: 12px">
@@ -153,7 +153,7 @@ class CertimensPanel {
 
         <div class="card stack" style="gap: 8px">
             <div id="measuring" class="muted small">${esc(t('panel.measured'))}</div>
-            <div id="engineIds" class="engineIds small"></div>
+            <div id="measured" class="measured small"></div>
         </div>
     </div>
 
@@ -199,28 +199,28 @@ class CertimensPanel {
             show('measuring', !state.paused);
             show('actions', state.connected);
 
-            // Une icône ne nomme rien : chaque bouton porte son action comme nom accessible, et
-            // la phrase qui dit ce qu'il déclenche en infobulle.
+            // An icon names nothing on its own: each button carries its action as an accessible
+            // name, and the sentence that says what pressing it does as a tooltip.
             const pause = $('pause');
             pause.setAttribute('aria-pressed', String(!!state.paused));
             pause.setAttribute('aria-label', state.paused ? state.labels.resume : state.labels.suspend);
             pause.title = state.paused ? state.labels.resumeTip : state.labels.suspendTip;
-            // Un élément SVG n'a pas la propriété hidden (elle est sur HTMLElement) : il faut
-            // poser l'attribut, sinon l'icône ne bascule jamais. Pas d'accent grave ici : tout
-            // ce bloc vit dans le gabarit qui construit la page.
+            // An SVG element does not implement the hidden property (it lives on HTMLElement):
+            // the attribute has to be written by hand, or the icon never swaps. No backtick in
+            // this block — all of it lives inside the template that builds the page.
             showIcon($('iconPause'), !state.paused);
             showIcon($('iconPlay'), !!state.paused);
             $('logout').setAttribute('aria-label', state.labels.logout);
             $('logout').title = state.labels.logoutTip;
 
-            $('engineIds').textContent = '';
-            for (const name of state.engineIds) {
+            $('measured').textContent = '';
+            for (const name of state.measured) {
                 const row = document.createElement('div');
                 row.textContent = name;
-                $('engineIds').appendChild(row);
+                $('measured').appendChild(row);
             }
-            if (state.engineIds.length === 0) $('engineIds').textContent = state.labels.noneMeasured;
-            show('engineIds', !state.paused);
+            if (state.measured.length === 0) $('measured').textContent = state.labels.noneMeasured;
+            show('measured', !state.paused);
 
             const message = $('message');
             message.textContent = state.status.text;
@@ -260,7 +260,7 @@ class CertimensPanel {
                 document: identity && { name: identity.documentName, linked: !!engineIds[identity.documentId] },
                 // The files measured since this window opened, which is what the student can
                 // check against what the engine shows.
-                engineIds: [...this.agent.sensors.values()].map((sensor) => sensor.documentName).sort(),
+                measured: [...this.agent.sensors.values()].map((sensor) => sensor.documentName).sort(),
             });
         }, () => {});
     }
@@ -269,7 +269,7 @@ class CertimensPanel {
         const commands = {
             login: () => this.agent.engine
                 .login({ engineUrl: message.engineUrl, email: message.email, password: message.password })
-                .then((me) => vscode.window.showInformationMessage(`Certimens : connecté en tant que ${me.email}.`)),
+                .then((me) => vscode.window.showInformationMessage(t('login.done', { email: me.email }))),
             logout: () => this.agent.engine.logout(),
             submit: () => vscode.commands.executeCommand('certimens.submit'),
             togglePause: () => vscode.commands.executeCommand('certimens.togglePause'),
@@ -279,7 +279,7 @@ class CertimensPanel {
         Promise.resolve()
             .then(command)
             .then(() => this.refresh())
-            .catch((err) => vscode.window.showErrorMessage(`Certimens : ${err.message || err}`));
+            .catch((err) => vscode.window.showErrorMessage(t('error.prefix', { message: err.message || err })));
     }
 }
 

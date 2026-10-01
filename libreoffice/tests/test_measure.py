@@ -145,6 +145,32 @@ class SelectionReplacementTest(unittest.TestCase):
         self.assertEqual(measure.window.macro_revisions, 0)
         self.assertEqual(measure.window.reformulations, 0)
 
+    def test_a_bare_modifier_is_not_a_keystroke(self):
+        """Shift, Ctrl or Alt pressed on its own writes nothing.
+
+        Counting one inflated total_keystrokes for everyone who types capitals, and its
+        near-zero gap before the character it modifies passed for an impossibly fast one —
+        exactly what mad_ms and median_flight_ms exist to tell apart. Word and VS Code, which
+        count characters, never see one: the rule is the same in the four agents.
+        """
+        measure = m.Measure()
+        measure.on_key(0.00, m.MODIFIER)
+        measure.on_key(0.02, m.OTHER, shift=True)
+        measure.on_key(0.20, m.MODIFIER)
+        measure.on_key(0.22, m.OTHER, shift=True)
+        self.assertEqual(measure.window.keystrokes, 2)
+        # From one capital to the next, not from Shift to the letter it modifies.
+        self.assertEqual([round(f) for f in measure.window.flights], [200])
+
+    def test_a_modifier_does_not_spend_the_click_before_it(self):
+        """Shift pressed between a click and a Backspace: still a mass revision."""
+        measure = m.Measure()
+        measure.on_click(0.0)
+        measure.on_key(0.2, m.MODIFIER)
+        measure.on_key(0.4, m.ERASE)
+        self.assertEqual(measure.window.macro_revisions, 1)
+        self.assertEqual(measure.window.corrections, 0)
+
     def test_a_plain_navigation_collapses_the_selection(self):
         measure = m.Measure()
         measure.on_key(0.0, m.OTHER, ctrl=True, letter='a')

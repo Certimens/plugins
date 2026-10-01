@@ -103,7 +103,7 @@ async function render() {
     // The account's language, as soon as it is known; Word's display language until then.
     document.documentElement.lang = setLanguage(config.language, Office.context.displayLanguage);
     applyTranslations();
-    const loggedIn = !!(config.token || config.password) && getState().status.state !== 'auth_error';
+    const loggedIn = !!config.token && getState().status.state !== 'auth_error';
     $('login').hidden = loggedIn;
     $('account').hidden = !loggedIn;
     renderSync();
@@ -142,7 +142,7 @@ $('login').addEventListener('submit', async (e) => {
     e.preventDefault();
     const button = e.submitter;
     button.disabled = true;
-    showMessage('Connexion…', true);
+    showMessage(t('login.connecting'), true);
     try {
         const me = await login({
             engineUrl: $('engineUrl').value.trim() || DEFAULT_ENGINE_URL,
@@ -150,7 +150,7 @@ $('login').addEventListener('submit', async (e) => {
             password: $('password').value,
         });
         $('password').value = '';
-        showMessage(`Connecté en tant que ${me.email}.`, true);
+        showMessage(t('login.loggedInAs', { email: me.email }), true);
         render();
     } catch (err) {
         showMessage(errorText(failure(err)), false);
@@ -223,14 +223,18 @@ $('pause').addEventListener('click', () => {
     // keeps accumulating behind a suspended sensor.
     if (paused) flush('pause');
     setPaused(paused);
-    // Le bandeau permanent dit déjà la suspension (renderSync) : la confirmer en plus mettait
-    // deux messages l'un sous l'autre. Seule la reprise mérite un message, elle n'en laisse aucun.
+    // The permanent banner already says it is suspended (renderSync): confirming it on top put
+    // two messages one under the other. Only resuming deserves one, since it leaves nothing.
     if (paused) clearMessage();
     else showMessage(t('pause.resumed'), true);
 });
 
 Office.onReady(async (info) => {
     if (info.host !== Office.HostType.Word) return;
+    // Before anything else: the agent starts sending straight away, and the messages it words for
+    // a refused send (an unreachable engine, a revoked token) must already be in the right
+    // language. render() sets it again once the account's own is known.
+    setLanguage(getConfig().language, Office.context.displayLanguage);
     current.docId = documentId();
     $('webNote').hidden = !isWordOnline();
     onStatusChange(renderSync);

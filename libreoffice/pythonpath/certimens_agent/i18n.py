@@ -28,11 +28,19 @@ MESSAGES = {
         'account.logoutTip': 'Se déconnecter — le jeton d’accès est révoqué sur le moteur ; la mesure s’arrête jusqu’à la prochaine connexion.',
         'account.loggingOut': 'Déconnexion…',
         'common.close': 'Fermer',
+        'common.loading': 'Chargement…',
 
         'error.credentials': 'Identifiants incorrects ou accès révoqué — reconnectez-vous.',
         'error.engineUnreachable': 'Moteur injoignable ({message}).',
         'error.networkError': 'erreur réseau',
         'error.unknown': 'erreur inconnue',
+        'error.unexpected': 'Erreur : {message}',
+        # Wording shared with extension/i18n.js, key for key: tests/test_i18n.py holds the two
+        # dictionaries to it, so that the same refusal reads the same from one agent to the next.
+        'error.noFile': "créez d'abord son document Certimens",
+        'error.tooLarge': 'document trop volumineux (18 Mo maximum)',
+        'error.notEnrolled': "vous n'êtes pas rattaché à ce devoir",
+        'sync.auth_error': 'Identifiants refusés par le moteur.',
 
         'doc.unlinked': "Ce document n'a pas encore de document Certimens.",
         'doc.name': 'Nom du document',
@@ -98,11 +106,17 @@ MESSAGES = {
         'account.logoutTip': 'Log out — the access token is revoked on the engine; measurement stops until you log in again.',
         'account.loggingOut': 'Logging out…',
         'common.close': 'Close',
+        'common.loading': 'Loading…',
 
         'error.credentials': 'Wrong credentials, or access revoked — log in again.',
         'error.engineUnreachable': 'Engine unreachable ({message}).',
         'error.networkError': 'network error',
         'error.unknown': 'unknown error',
+        'error.unexpected': 'Error: {message}',
+        'error.noFile': 'create its Certimens document first',
+        'error.tooLarge': 'document too large (18 MB maximum)',
+        'error.notEnrolled': 'you are not enrolled in this assignment',
+        'sync.auth_error': 'Credentials refused by the engine.',
 
         'doc.unlinked': 'This document has no Certimens document yet.',
         'doc.name': 'Document name',

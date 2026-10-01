@@ -33,7 +33,7 @@ $('form').addEventListener('submit', async (e) => {
     if (!engineUrl) return;
     const button = e.submitter;
     button.disabled = true;
-    showMessage('Connexion…', true);
+    showMessage(t('login.connecting'), true);
     // Login exchanges the password for an API token: only the token is kept.
     const res = await chrome.runtime.sendMessage({
         type: 'CERTIMENS_LOGIN',

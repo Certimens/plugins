@@ -111,7 +111,7 @@ function noteLocalEvent() {
 
 // Empty selection or not: deleting a selection is a macro-revision.
 function onSelectionChanged() {
-    if (isPaused()) return;
+    if (isPaused()) return; // noteLocalEvent checks it too, but the selection read below must not run
     noteLocalEvent();
     Office.context.document.getSelectedDataAsync(Office.CoercionType.Text, (result) => {
         if (result.status === Office.AsyncResultStatus.Succeeded) rangeSelected = chars(result.value) > 0;

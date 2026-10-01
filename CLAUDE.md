@@ -17,6 +17,8 @@ face.
 | `libreoffice/` | extension Writer en Python/UNO, paquet `.oxt` |
 | `vscode/` | extension Visual Studio Code, paquet `.vsix` — un document moteur par fichier du projet |
 | `scripts/` | build des paquets, certificat de dev Word, visuels de marque |
+| `tests/` | les capteurs JavaScript, sans navigateur ni hôte (`npm test`) |
+| `store/` | visuels et textes des fiches des boutiques |
 | `legacy/` | anciens agents de bureau, conservés pour référence — ne pas faire évoluer |
 
 La documentation de référence vit dans **`docs/`** ([docs/README.md](docs/README.md) en est le

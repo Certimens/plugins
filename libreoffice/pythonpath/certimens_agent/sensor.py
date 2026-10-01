@@ -23,6 +23,7 @@ from com.sun.star.frame import XDispatch, XDispatchProviderInterceptor
 
 from . import measure as m
 from .i18n import t
+from .log import warn
 
 DOCUMENT_ID_PROPERTY = 'CertimensDocumentId'
 VOLUME_REFRESH_S = 5
@@ -307,7 +308,7 @@ class KeyHandler(unohelper.Base, XKeyHandler):
         try:
             self.sensor.on_key(event)
         except Exception as err:
-            print('Certimens:', err)
+            warn('touche', err)
         return False  # the key continues on to the document
 
     def keyReleased(self, event):
@@ -328,7 +329,7 @@ class MouseHandler(unohelper.Base, XMouseClickHandler):
         try:
             self.sensor.on_click()
         except Exception as err:
-            print('Certimens:', err)
+            warn('clic', err)
         return False
 
     def mouseReleased(self, event):
@@ -349,7 +350,7 @@ class PasteDispatch(unohelper.Base, XDispatch):
         try:
             self.sensor.on_paste()
         except Exception as err:
-            print('Certimens:', err)
+            warn('collage', err)
         self.slave.dispatch(url, args)
 
     def addStatusListener(self, listener, url):
@@ -432,7 +433,7 @@ class DocumentEvents(unohelper.Base, XDocumentEventListener):
             elif name == 'OnPrepareUnload':
                 self.sensor.flush('pagehide')
         except Exception as err:
-            print('Certimens:', err)
+            warn('événement document', err)
 
     def disposing(self, source):
         pass

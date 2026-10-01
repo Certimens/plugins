@@ -12,6 +12,7 @@ import unohelper
 from com.sun.star.task import XJob, XJobExecutor
 
 from certimens_agent import agent, dialogs
+from certimens_agent.log import warn
 from certimens_agent.sensor import is_writer
 
 IMPLEMENTATION = 'fr.certimens.Agent'
@@ -36,7 +37,7 @@ class Agent(unohelper.Base, XJob, XJobExecutor):
         try:
             dialogs.open_window(self.ctx, current, doc)
         except Exception as err:  # a window must never take LibreOffice down with it
-            print('Certimens:', err)
+            warn('fenêtre Certimens', err)
 
 
 g_ImplementationHelper = unohelper.ImplementationHelper()

@@ -20,8 +20,13 @@ dernière activité** : l'inactivité n'y entre jamais — le moteur pondère se
 des périodes, une fenêtre gonflée de temps mort fausserait tout.
 
 Elle est vidée (envoyée) après **2 s sans activité**, à **200 frappes**, sur **Ctrl/Cmd+S**,
-quand l'étudiant **quitte le document** (autre onglet, autre fenêtre, éditeur réduit) et à la
-fermeture du document.
+quand l'étudiant **quitte le document** (autre onglet, autre fenêtre, éditeur réduit), à la
+fermeture du document et au moment de suspendre la mesure.
+
+Les trois derniers déclencheurs demandent que l'hôte les signale. Le complément Word ne voit ni
+l'enregistrement ni la sortie du document : ses fenêtres partent sur l'inactivité, sur les
+200 frappes et à la fermeture du volet. C'est sans conséquence sur ce qui est compté — une
+fenêtre vidée plus tard reste la même fenêtre —, seulement sur le moment où elle part.
 
 ## Constantes communes
 
@@ -48,7 +53,7 @@ suivrait exactement `total_keystrokes`.
 
 | Type | Mesure |
 | --- | --- |
-| `total_keystrokes` | Frappes (hors répétition automatique) |
+| `total_keystrokes` | Frappes (hors répétition automatique et touches de modification seules) |
 | `effective_time_seconds` | Temps de frappe effectif |
 | `immediate_corrections` | Backspace/Suppr en cours de frappe, Ctrl/Cmd+Z |
 | `deferred_reformulations` | **Première** Backspace/Suppr après un déplacement au clavier, ou remplacement d'une sélection Maj+flèches |
@@ -92,11 +97,22 @@ cognitive.
 **La répétition automatique ne compte pas** : garder Suppr enfoncée pour effacer un mot vaut une
 seule suppression.
 
+**Une touche de modification seule n'est pas une frappe.** Maj, Ctrl, Alt ou AltGr pressée pour
+elle-même n'écrit rien : elle n'ouvre pas de fenêtre, ne compte pas dans `total_keystrokes` et
+n'entre pas dans les flight times — l'écart minuscule qu'elle laisse avant la lettre qu'elle
+modifie passerait pour une frappe impossiblement rapide et régulière, ce que `mad_ms` et
+`median_flight_ms` servent justement à distinguer. Elle ne solde pas non plus le déplacement qui
+la précède : un Maj glissé entre un clic et une Suppr laisse la suppression compter pour une
+révision massive. La règle ne concernait que l'extension navigateur et LibreOffice, les seuls à
+voir les touches ; Word et VS Code, qui comptent des caractères, n'en voyaient déjà aucune — les
+compter d'un côté faisait paraître le même étudiant plus rapide et plus prolixe dans le
+navigateur que dans un éditeur.
+
 ## Écarts assumés
 
 - **Complément Word** : pas de `mad_ms`, `median_flight_ms` ni `focus_losses`. Office ne livre ni
-  les frappes (le capteur travaille par différences de texte) ni la sortie du document ; une
-  cadence calculée sur ses événements serait fausse. Une « frappe » y est un caractère inséré ou
+  les frappes (le capteur travaille par différences de texte), ni la sortie du document, ni
+  l'enregistrement ; une cadence calculée sur ses événements serait fausse. Une « frappe » y est un caractère inséré ou
   effacé. N'ayant jamais compté que des différences, il n'a jamais eu le biais du clic et voyait
   déjà le remplacement d'une sélection.
 - **LibreOffice** : mêmes metrics et mêmes définitions que l'extension, flight times compris

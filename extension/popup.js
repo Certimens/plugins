@@ -216,7 +216,7 @@ $('exportDocx').addEventListener('click', () => {
 });
 
 $('docxFile').addEventListener('change', async (e) => {
-    const file = e.target.engineIds[0];
+    const file = e.target.files[0];
     e.target.value = '';
     if (!file) return;
     const bytes = new Uint8Array(await file.arrayBuffer());
@@ -239,9 +239,9 @@ $('logout').addEventListener('click', async () => {
 $('pause').addEventListener('click', async () => {
     const res = await chrome.runtime.sendMessage({ type: 'CERTIMENS_SET_PAUSED', paused: !current.paused });
     if (!res.ok) return showMessage(errorText(res), false);
-    // Suspendre affiche déjà un bandeau permanent : le confirmer en plus mettait deux messages
-    // rouges l'un sous l'autre, disant la même chose en deux formulations. La reprise, elle,
-    // ne laisse rien à l'écran — c'est le seul cas où une confirmation apprend quelque chose.
+    // Pausing already shows a permanent banner: confirming it on top put two red blocks one
+    // under the other, saying the same thing in two wordings. Resuming leaves nothing on screen,
+    // which is the one case where a confirmation tells the student something.
     if (res.paused) clearMessage();
     else showMessage(t('pause.resumed'), true);
     render();

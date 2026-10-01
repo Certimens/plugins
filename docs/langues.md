@@ -32,6 +32,25 @@ de ses e-mails.
 Aucune page ne porte de texte en dur : `data-i18n="clé"` côté extension et Word, injection à la
 construction côté VS Code.
 
+## Un refus est un texte d'interface
+
+Les pages ne sont pas les seules à parler. Ce qu'un agent **formule lui-même** quand il refuse —
+un document trop volumineux, un devoir auquel l'étudiant n'est pas rattaché, un export Google
+Docs bloqué, une lecture de document impossible — finit dans le même bandeau que le reste et
+vient donc du dictionnaire, comme n'importe quelle étiquette. Ce qui vient du **moteur**, lui,
+est repris tel quel : il répond déjà dans la langue du compte.
+
+Ces phrases-là se rédigent comme des **fragments**, en minuscule et sans point final : elles
+s'insèrent dans `upload.failed`, `submit.refused` ou `error.prefix`, qui portent la ponctuation.
+
+## La langue se choisit avant le premier envoi
+
+Un agent envoie avant d'afficher : la file part dès le démarrage, et le premier message qu'il
+formule peut être celui d'un envoi refusé, sans qu'aucune page ait été rendue. `setLanguage` va
+donc au **démarrage de l'agent**, pas au premier rendu — et, dans le service worker de
+l'extension, au chargement du script plutôt que depuis `onInstalled` ou `onStartup` : un worker
+est réveillé par une alarme ou un message bien plus souvent qu'il n'est installé.
+
 ## Le manifest est lu avant notre code
 
 C'est l'hôte qui le traduit, d'après sa **propre** langue d'interface. Le nom dans la barre

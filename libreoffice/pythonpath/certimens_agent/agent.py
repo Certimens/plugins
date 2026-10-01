@@ -12,6 +12,7 @@ from com.sun.star.document import XDocumentEventListener
 
 from .engine import Engine
 from .i18n import office_language, set_language
+from .log import warn
 from .sensor import DocumentSensor, is_writer
 
 _lock = threading.Lock()
@@ -58,7 +59,7 @@ class Agent(unohelper.Base, XDocumentEventListener):
                 if sensor:
                     sensor.detach()
         except Exception as err:
-            print('Certimens:', err)
+            warn('événement document', err)
 
     def disposing(self, source):
         pass

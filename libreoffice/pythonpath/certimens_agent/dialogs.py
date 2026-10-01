@@ -26,6 +26,7 @@ from com.sun.star.awt import XActionListener
 
 from .i18n import t
 from .engine import DEFAULT_ENGINE_URL, HttpError
+from .log import warn
 
 # Writer's Word filter — what "Enregistrer sous… .docx" uses.
 DOCX_FILTER = 'MS Word 2007 XML'
@@ -244,7 +245,7 @@ class Window(unohelper.Base, XActionListener):
         except HttpError as err:
             self.message(error_text(err))
         except Exception as err:
-            self.message('Erreur : %s' % err)
+            self.message(t('error.unexpected', message=err))
 
     def call(self, work, done, busy=None):
         """Runs an engine call off the UI thread, then hands the result to done(result, error)."""
@@ -267,7 +268,7 @@ class Window(unohelper.Base, XActionListener):
                 self.set_busy(False)
                 done(result, error)
             except Exception as err:
-                print('Certimens:', err)
+                warn('fenêtre Certimens', err)
 
         threading.Thread(target=task, name='certimens-window', daemon=True).start()
 
@@ -286,7 +287,7 @@ class LoginWindow(Window):
         self.field('engineUrl', t('login.engineUrl'), config.get('engineUrl') or DEFAULT_ENGINE_URL)
         self.gap()
         self.button('login', t('login.submit'), self.login, default=True)
-        self.button('cancel', 'Fermer', self.close, blocking=False)
+        self.button('cancel', t('common.close'), self.close, blocking=False)
 
     def login(self):
         email, password = self.value('email'), self.model.getByName('password').getPropertyValue('Text')
@@ -301,7 +302,7 @@ class LoginWindow(Window):
                 return
             self.close('logged-in')
 
-        self.call(lambda: self.engine.login(engine_url, email, password), done, busy='Connexion…')
+        self.call(lambda: self.engine.login(engine_url, email, password), done, busy=t('login.busy'))
 
 
 class DocumentWindow(Window):
@@ -405,7 +406,7 @@ class DocumentWindow(Window):
                 self.message(t('doc.gone'))
                 self.close('reopen')
 
-        self.call(work, done, busy='Chargement…')
+        self.call(work, done, busy=t('common.loading'))
 
     def fill_assignments(self):
         control = self.control('assignment')
@@ -493,10 +494,11 @@ class DocumentWindow(Window):
             self.show_file({**(self.file or {}), **file})
             self.message(t('upload.doneWithSize', size=len(document) // 1024))
 
-        self.call(lambda: self.engine.upload_docx(self.doc_id, document), done, busy='Envoi du document…')
+        self.call(lambda: self.engine.upload_docx(self.doc_id, document), done, busy=t('upload.busy'))
 
     def open_in_browser(self):
-        url = '%s/file/%s' % (self.engine.config()['engineUrl'].rstrip('/'), self.engine_id)
+        # /document/:id, the address the popup and the Word task pane open too.
+        url = '%s/document/%s' % (self.engine.config()['engineUrl'].rstrip('/'), self.engine_id)
         shell = self.ctx.ServiceManager.createInstanceWithContext('com.sun.star.system.SystemShellExecute', self.ctx)
         shell.execute(url, '', URIS_ONLY)
 

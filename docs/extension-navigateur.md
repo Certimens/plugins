@@ -17,7 +17,10 @@ Les chemins ci-dessous sont relatifs à `extension/`.
 - `background.js` crée au premier envoi le **document Certimens** du document ouvert
   (`POST /api/documents`, nommé d'après son titre), puis envoie les mesures. Hors-ligne, elles restent dans une file
   (`chrome.storage.local`) renvoyée chaque minute. Le badge affiche `ON`, le nombre de mesures en
-  attente, ou `OFF` (non configuré, ou identifiants refusés).
+  attente, `OFF` (non configuré, ou identifiants refusés) ou `II` (mesure suspendue, voir
+  [mesures.md](mesures.md)).
+- `i18n.js`, `ui.js`, `ui.css` sont partagés avec le complément Word, que le build sert depuis
+  une copie ([langues.md](langues.md)).
 
 ## La popup
 

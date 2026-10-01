@@ -98,6 +98,27 @@ test('remplacer une sélection est une suppression', async (t) => {
         assert.equal(s.counters.reformulations, 0);
     });
 
+    await t.test('une touche de modification seule ne compte pas', () => {
+        // Elle n'écrit rien, et l'écart minuscule qu'elle laisse avant la lettre qu'elle modifie
+        // passerait pour une frappe impossiblement rapide — c'est précisément ce que mad_ms et
+        // median_flight_ms servent à distinguer. Word et VS Code, qui comptent des caractères,
+        // n'en voient jamais : la règle est la même dans les quatre agents.
+        const s = sensor();
+        s.press('Shift');
+        s.press('A', { shiftKey: true });
+        s.press('Control');
+        assert.equal(s.counters.keystrokes, 1);
+    });
+
+    await t.test('une touche de modification ne solde pas le clic qui la précède', () => {
+        const s = sensor();
+        s.click();
+        s.press('Shift');
+        s.press('Backspace');
+        assert.equal(s.counters.macroRevisions, 1);
+        assert.equal(s.counters.corrections, 0);
+    });
+
     await t.test('un déplacement sans Maj annule la sélection', () => {
         const s = sensor();
         s.selectAll();
