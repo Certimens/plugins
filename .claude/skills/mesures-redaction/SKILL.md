@@ -9,10 +9,10 @@ Une seule définition, quatre implémentations indépendantes :
 
 | Implémentation | Fenêtres de mesure | Capteur |
 | --- | --- | --- |
-| Extension navigateur | `extension/content.js` | le même fichier (clavier/souris) |
-| Complément Word | `word/sensor.js` | le même fichier (différences de texte) |
-| Extension LibreOffice | `libreoffice/pythonpath/certimens_agent/measure.py` | `sensor.py` (UNO) |
-| Extension VS Code | `vscode/sensor.js` | le même fichier (modifications du document) |
+| Extension navigateur | `browser/src/content.js` | le même fichier (clavier/souris) |
+| Complément Word | `word/src/sensor.js` | le même fichier (différences de texte) |
+| Extension LibreOffice | `libreoffice/src/pythonpath/certimens_agent/measure.py` | `sensor.py` (UNO) |
+| Extension VS Code | `vscode/src/sensor.js` | le même fichier (modifications du document) |
 
 **Une règle changée dans l'une doit l'être dans les trois autres**, ou être justifiée par une
 limite de la plateforme (voir *Écarts assumés*). Le tableau des metrics de `docs/mesures.md`
@@ -95,10 +95,10 @@ exception : faute de bandeau permanent, son message *est* l'affichage de l'état
 
 | Implémentation | Où l'état est gardé | Où les événements sont filtrés |
 | --- | --- | --- |
-| Extension navigateur | `chrome.storage.local`, clé `paused` | `extension/content.js` (chaque gestionnaire, et `recordInjection`) |
-| Complément Word | `localStorage` partagé, `isPaused()` d'`agent.js` | `word/sensor.js` (`noteLocalEvent`, `onSelectionChanged`) |
+| Extension navigateur | `chrome.storage.local`, clé `paused` | `browser/src/content.js` (chaque gestionnaire, et `recordInjection`) |
+| Complément Word | `localStorage` partagé, `isPaused()` d'`agent.js` | `word/src/sensor.js` (`noteLocalEvent`, `onSelectionChanged`) |
 | Extension LibreOffice | `certimens.json`, `Engine.paused()` | `sensor.py` (`on_key`, `on_click`, `on_paste`, `on_deactivated`) |
-| Extension VS Code | `globalState`, `Agent.paused()` | `vscode/extension.js` (les gestionnaires de l'hôte) |
+| Extension VS Code | `globalState`, `Agent.paused()` | `vscode/src/extension.js` (les gestionnaires de l'hôte) |
 
 Le complément Word est le seul cas où la lecture du document **continue** pendant la pause : son
 capteur travaille par différences, et sans rafraîchir sa référence, tout ce qui a été écrit
@@ -108,7 +108,7 @@ pendant la pause atterrirait d'un coup dans la première fenêtre d'après (voir
 
 Aucune touche, aucun caractère, aucun texte ne quitte le poste ni n'est conservé au-delà de ce
 qu'exige le calcul. Les capteurs traduisent chaque touche en **catégorie** (`erase`,
-`navigation`, `modifier`, `other`) puis l'oublient ; `word/sensor.js` ne garde que la lecture
+`navigation`, `modifier`, `other`) puis l'oublient ; `word/src/sensor.js` ne garde que la lecture
 précédente du texte, le temps de la différence. Le mode debug journalise **des compteurs et des
 catégories uniquement**. Toute modification qui ferait transiter du texte vers le moteur casse la
 promesse produit affichée dans les boutiques : c'est un changement de contrat, pas un détail
@@ -124,6 +124,21 @@ c'était le bug qui empêchait `focus_losses` de repartir.
 
 La liste des types acceptés est tenue par le moteur, lui seul. Ajouter une metric, c'est donc
 **deux chantiers** : le moteur d'abord, les agents ensuite, avec la dégradation ci-dessus.
+
+## La forme d'une mesure n'est pas libre
+
+Le moteur reconnaît le sérialiseur d'un agent à **l'ordre** des clés, et il n'en connaît que
+deux : `{type, value, period}`, et la même avec **`offline` ajouté en dernier**. Un corps
+indenté, une clé insérée ailleurs, ou `offline` envoyé systématiquement plutôt que seulement
+quand il est vrai : chacun lève un signal silencieux sur **tous** les envois, visible de
+l'évaluateur et jamais renvoyé à l'agent.
+
+`offline` décrit la **fenêtre**, pas la file : vrai si, à la clôture de la fenêtre, la dernière
+tentative d'envoi avait échoué — jamais `navigator.onLine`, qu'un portail captif trompe et que
+deux agents sur quatre n'ont pas. Il est posé à la mise en file, pas au départ.
+
+**Ajouter un champ à une mesure est donc aussi deux chantiers**, dans le même ordre.
+Vérification : `libreoffice/tests/test_engine.py`, qui tient l'ordre sur un vrai corps HTTP.
 
 ## Écarts assumés
 
@@ -164,8 +179,8 @@ Une règle commune ajoutée ou changée se teste dans chaque suite — les cas s
 mêmes de l'une à l'autre, c'est ce qui rend une divergence visible.
 
 ```bash
-npm test                   # toutes les suites
-npm run test:js            # capteurs navigateur, Word et VS Code (node --test, sans dépendance)
-npm run test:libreoffice   # python3 -m unittest discover -s libreoffice/tests
-npm run lint               # ESLint sur extension/, word/, scripts/ et tests/
+make test                  # toutes les suites, agent par agent
+make -C browser test       # un seul agent (node --test, sans dépendance)
+make -C libreoffice test   # python3 -m unittest discover -s tests
+make lint                  # tous les linters : JS, CSS, HTML, Markdown, Python, shell
 ```

@@ -1,11 +1,11 @@
 # Extension navigateur
 
-Extension **Manifest V3** (`extension/`) qui mesure la rédaction **directement dans Google Docs
+Extension **Manifest V3** (`browser/`) qui mesure la rédaction **directement dans Google Docs
 et Word Online**, sans agent de bureau : Chrome, Edge, Opera, Brave, Vivaldi, Arc, Firefox,
 Firefox pour Android, Safari macOS et iOS. Un seul jeu de sources, un seul manifest ; le build
 en tire le paquet de chaque navigateur (voir [developpement.md](developpement.md)).
 
-Les chemins ci-dessous sont relatifs à `extension/`.
+Les chemins ci-dessous sont relatifs à `browser/src/`, le dossier qui part dans les paquets.
 
 ## Fonctionnement
 
@@ -15,7 +15,8 @@ Les chemins ci-dessous sont relatifs à `extension/`.
   la zone `#WACViewPanel`. Ce qui diffère d'un éditeur à l'autre est décrit dans `EDITORS`. Les
   règles de comptage, elles, sont communes aux quatre agents ([mesures.md](mesures.md)).
 - `background.js` crée au premier envoi le **document Certimens** du document ouvert
-  (`POST /api/documents`, nommé d'après son titre), puis envoie les mesures. Hors-ligne, elles restent dans une file
+  (`POST /api/documents`, nommé d'après son titre), puis envoie les mesures. Hors-ligne,
+  elles restent dans une file
   (`chrome.storage.local`) renvoyée chaque minute. Le badge affiche `ON`, le nombre de mesures en
   attente, `OFF` (non configuré, ou identifiants refusés) ou `II` (mesure suspendue, voir
   [mesures.md](mesures.md)).
@@ -63,7 +64,7 @@ La page d'options s'ouvre à l'installation : adresse du moteur (par défaut
 
 > Sur Word pour le web, ne pas utiliser l'extension en même temps que le complément Word : la
 > rédaction serait comptée deux fois (le volet le rappelle).
-
+>
 > Ne pas l'utiliser non plus en même temps que l'agent de bureau + Web Shield (`legacy/`) sur
 > Google Docs, pour la même raison.
 
@@ -84,11 +85,11 @@ reste la même. L'état « mesures étendues refusées par le moteur » est affi
 ## Installer en développement
 
 - **Chrome / Edge** : `chrome://extensions` → mode développeur → *Charger l'extension non
-  empaquetée* → le dossier `extension/`.
-- **Firefox** : `about:debugging` → *Charger un module temporaire* → `extension/manifest.json`.
+  empaquetée* → le dossier `browser/`.
+- **Firefox** : `about:debugging` → *Charger un module temporaire* → `browser/src/manifest.json`.
 - **Opera, Brave, Vivaldi, Arc** : comme Chrome (`opera://extensions`, `brave://extensions`…).
-- **Safari** (macOS, Xcode) : `npm run build && npm run build:safari`, ouvrir le projet
-  `dist/safari-xcode/Certimens/Certimens.xcodeproj`, lancer le schéma *Certimens (macOS)*, puis
+- **Safari** (macOS, Xcode) : `make build && make -C browser safari`, ouvrir le projet
+  `browser/dist/safari-xcode/Certimens/Certimens.xcodeproj`, lancer le schéma *Certimens (macOS)*, puis
   dans Safari : *Réglages › Développement › Autoriser les extensions non signées* et activer
   l'extension dans *Réglages › Extensions*. Le schéma *Certimens (iOS)* la lance sur iPhone et
   iPad.

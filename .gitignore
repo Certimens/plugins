@@ -1,11 +1,9 @@
-node_modules/
-dist/
-.env.submit
-__pycache__/
+# Ce qui n'appartient à aucun agent. Chaque projet ignore ce qu'il produit lui-même, dans son
+# propre .gitignore : la racine n'a ni outillage ni dépendance.
 
-# Claude Code: CLAUDE.md and .claude/skills/ are part of the repository — they describe the
-# rules the three agents share. Only the per-machine permissions stay out.
-.claude/settings.local.json
-
-# macOS: the Safari conversion and the Word desktop tests are run from a Mac.
+# macOS, sur les postes qui servent à la conversion Safari et aux essais Word.
 .DS_Store
+
+# Claude Code : CLAUDE.md et .claude/skills/ font partie du dépôt — ils décrivent les règles
+# que les quatre agents partagent. Seules les permissions propres à une machine restent dehors.
+.claude/settings.local.json

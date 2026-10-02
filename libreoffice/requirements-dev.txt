@@ -1,0 +1,4 @@
+# Developer tooling for the LibreOffice agent — installed in .venv by `make install`, never
+# shipped. The extension itself imports nothing but the standard library.
+ruff==0.16.10
+coverage==7.16.2

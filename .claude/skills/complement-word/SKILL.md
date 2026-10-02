@@ -14,13 +14,13 @@ le web. `sensor.js` est le capteur (voir `mesures-redaction`), `agent.js` l'envo
 Le complément est **servi par GitHub Pages** (`https://certimens.github.io/plugins/word/`) :
 le manifest ne contient que des URL. Conséquences :
 
-- `word/manifest.xml` est un **gabarit** : `{{BASE_URL}}` et `{{VERSION}}` sont remplacés par
-  `scripts/build.mjs`. Ne jamais y écrire d'URL ou de version en dur.
+- `word/src/manifest.xml` est un **gabarit** : `{{BASE_URL}}` et `{{VERSION}}` sont remplacés par
+  `word/build.mjs`. Ne jamais y écrire d'URL ou de version en dur.
 - Office impose une version à **quatre nombres** (`X.Y.Z.0`) et ne peut pas porter le commit.
 - L'`<Id>` ne doit **plus jamais changer** une fois publié sur AppSource.
 - Publier un correctif ne demande ni release ni tag : `gh workflow run pages.yml --ref ma-branche`
   republie le site. C'est **la production** qui est remplacée ; pour un essai sans conséquence,
-  `npm run word:serve` + `dist/word-localhost.xml`.
+  `make -C word serve` + `word/dist/word-localhost.xml`.
 - Le moteur autorise cette origine en CORS sur `/api` (`https://certimens.github.io`, plus
   `https://localhost:3000` en développement) ; la liste est tenue côté moteur. Changer
   d'hébergement impose donc un changement là-bas, à demander avant de publier.
@@ -56,18 +56,18 @@ Ne jamais conserver le texte au-delà de la lecture précédente, ni l'envoyer.
 ## Tester en local
 
 ```bash
-npm run build && npm run word:serve   # HTTPS sur localhost:3000, certificat de dev au 1er lancement
-npm run lint:word                     # validation Microsoft du manifest (après build, réseau requis)
+make -C word build && make -C word serve   # HTTPS sur localhost:3000, certificat de dev au 1er lancement
+make -C word lint-manifest                 # validation Microsoft du manifest (après build, réseau requis)
 ```
 
-Charger `dist/word-localhost.xml` : sur le web via *Accueil › Compléments › Mes compléments ›
+Charger `word/dist/word-localhost.xml` : sur le web via *Accueil › Compléments › Mes compléments ›
 Charger mon complément* ; sur Windows/Mac via
-`npx office-addin-debugging start dist/word-localhost.xml desktop`.
+`npx office-addin-debugging start word/dist/word-localhost.xml desktop`.
 
 **Le volet montre encore l'ancien code ?** C'est le cache avant tout : Pages sert les fichiers
 quelques minutes, et Word garde le sien (`%LOCALAPPDATA%\Microsoft\Office\16.0\Wef` sous Windows,
 `~/Library/Containers/com.microsoft.Word/Data/Library/Caches` sous macOS). Vérifier ce qui est en
-ligne avec un `curl` sur `…/plugins/word/manifest.xml` avant de soupçonner le code.
+ligne avec un `curl` sur `…/plugins/word/src/manifest.xml` avant de soupçonner le code.
 
 ## Double comptage
 
@@ -88,6 +88,6 @@ n'est compté, mais la référence se rafraîchit (`BASELINE_REFRESH_MS`). Sans 
 ## Langues
 
 Le volet n'a pas de dictionnaire à lui : il charge `i18n.js` de l'extension, que le build copie
-dans `dist/word/`. Le manifest, lui, est traduit par Office (`<Override Locale="en-us">` sur
+dans `word/dist/word/`. Le manifest, lui, est traduit par Office (`<Override Locale="en-us">` sur
 `DisplayName`, `Description` et les `bt:String`), d'après la langue d'Office et non celle du
 compte Certimens. Règle complète : skill `langues-interface`.

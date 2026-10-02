@@ -1,12 +1,12 @@
-"""Definitions of measure.py (the same as extension/content.js)."""
+"""Definitions of measure.py (the same as browser/content.js)."""
 
 import os
 import sys
 import unittest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'pythonpath'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src', 'pythonpath'))
 
-from certimens_agent import measure as m  # noqa: E402
+from certimens_agent import measure as m
 
 
 def type_keys(measure, start, count, interval=0.15, category=m.OTHER):

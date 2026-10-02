@@ -33,7 +33,7 @@ l'étudiant se déconnecte. Un mot de passe recopié dans quatre agents, lui, ne
 | `POST /api/auth/tokens` | créer le jeton d'API conservé par l'agent |
 | `POST /api/auth/logout` | refermer la session de connexion |
 | `DELETE /api/auth/tokens/:id` | révoquer son propre jeton, à la déconnexion |
-| `GET /api/auth/me` | rôle et langue du compte (le choix d'un devoir n'est proposé qu'au rôle `student`) |
+| `GET /api/auth/me` | rôle, langue et nom affiché du compte (le choix d'un devoir n'est proposé qu'au rôle `student`) |
 | `POST /api/documents` | créer le document Certimens qui recevra les mesures |
 | `GET /api/documents/:id` | relire son état (nom, devoir, score) pour l'afficher |
 | `POST /api/documents/:id/metrics` | pousser un lot de fenêtres de mesure |
@@ -42,6 +42,19 @@ l'étudiant se déconnecte. Un mot de passe recopié dans quatre agents, lui, ne
 
 Le corps et les codes de retour de chaque appel sont documentés côté moteur ; ce que les agents
 en utilisent tient dans les pages de ce dossier.
+
+La connexion et `GET /api/auth/me` renvoient un **`display_name`** que le moteur calcule, et qui
+retombe sur l'e-mail quand le compte ne porte ni prénom ni nom. Les agents l'affichent à la
+place de l'e-mail dans leur ligne « Connecté : », en gardant l'e-mail en dessous quand il
+apporte quelque chose de plus. Un moteur trop ancien pour l'envoyer ne casse rien : le champ est
+absent, et la ligne retombe sur l'e-mail d'elle-même.
+
+Le moteur sait aussi servir la **photo** d'un compte, mais **aucun agent ne l'affiche**, et
+c'est un choix. Elle n'est pas un champ du JSON : c'est une ressource binaire qui exige
+l'en-tête d'authentification, donc impossible à poser dans un `<img src>` — il faudrait la
+récupérer puis la convertir, quatre fois, dont un passage par l'hôte pour la webview VS Code et
+un fichier temporaire pour les fenêtres UNO. Beaucoup de machinerie pour un ornement dans une
+fenêtre où l'étudiant sait déjà qui il est.
 
 Le dépôt de contenu passe par `PUT /api/documents/:id` avec le document en base64, **18 Mo** au plus
 (le moteur plafonne la requête à 25 Mio). Un nouvel envoi remplace le document précédent.
@@ -55,6 +68,41 @@ d'attente**, renvoyée chaque minute. Le stockage diffère (`chrome.storage.loca
 Conséquence assumée, côté moteur : une fenêtre légitime peut précéder son propre document de
 plusieurs heures — un travail commencé hors ligne. L'ingestion ne traite donc pas comme suspecte
 une période antérieure à la création du document.
+
+### Déclarer qu'une fenêtre a été écrite hors ligne
+
+Une mesure peut porter **`offline: true`**. Le champ ne décrit pas la file, il décrit la
+**fenêtre** : il dit que l'étudiant écrivait pendant que le moteur était hors d'atteinte.
+
+La règle est la même dans les quatre agents, et elle est posée **à la mise en file**, pas au
+départ : une fenêtre est `offline` si, au moment où elle a été close, la dernière tentative
+d'envoi avait échoué. Une fenêtre écrite alors que le moteur répondait encore part sans rien
+dire, même si elle attend ensuite des heures. Aucun agent ne se fie à `navigator.onLine` : un
+portail captif répond à la couche liaison et jamais au moteur, et deux des quatre agents n'ont
+de toute façon pas cette API.
+
+Ce que le champ produit côté moteur est un **taux de rédaction hors ligne**, affiché ; il
+n'entre pas dans le score. Déclarer `offline` ne retire aucun signal d'ingestion : un
+rattrapage reste un rattrapage.
+
+### L'ordre des clés d'une mesure n'est pas libre
+
+Le moteur reconnaît le sérialiseur d'un agent à **l'ordre** des clés qu'il écrit, et il n'en
+connaît que deux :
+
+```json
+{"type":"…","value":0,"period":{"start":"…","end":"…"}}
+{"type":"…","value":0,"period":{"start":"…","end":"…"},"offline":true}
+```
+
+`offline` s'ajoute **en dernier**, et **seulement quand il est vrai**. Une clé insérée ailleurs,
+un corps indenté, ou `offline` envoyé systématiquement : chacun de ces trois écarts fait lever
+un signal silencieux sur **tous** nos envois, que l'évaluateur voit et que rien ne renvoie à
+l'agent. `libreoffice/tests/test_engine.py` tient cet ordre pour les quatre, sur un vrai corps
+HTTP — c'est le seul agent qui a un moteur factice sous la main.
+
+**Ajouter un champ à une mesure, c'est donc deux chantiers** : le moteur doit d'abord déclarer
+la nouvelle forme, les agents l'envoient ensuite.
 
 ## Metrics refusées
 

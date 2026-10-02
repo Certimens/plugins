@@ -1,8 +1,11 @@
 name: CI
 
-# Lint et build de l'extension sur chaque branche et PR. Aussi appelée par release.yml, qui
-# publie les paquets construits ici (artefacts `extension` et `safari-xcode`) : une CI en échec
-# bloque la publication, et tous les navigateurs reçoivent le même build.
+# Lint, tests et build sur chaque branche et PR. Aussi appelée par release.yml, qui publie les
+# paquets construits ici : une CI en échec bloque la publication.
+#
+# Un job par projet, parce que le dépôt en contient quatre : chacun installe son outillage et
+# appelle son propre Makefile, exactement comme on le ferait en local. Un agent qui casse ne
+# masque pas les autres (fail-fast est inutile ici : les jobs sont déjà indépendants).
 on:
   push:
     branches: ['**']
@@ -10,7 +13,7 @@ on:
   workflow_call:
     inputs:
       version:
-        description: Version attendue dans le manifest (tag de release)
+        description: Version imposée aux paquets (tag de release)
         type: string
         default: ''
 
@@ -18,8 +21,8 @@ permissions:
   contents: read
 
 jobs:
-  extension:
-    name: Extension
+  browser:
+    name: Extension navigateur
     runs-on: ubuntu-latest
     steps:
       # fetch-depth 0: the build reads the last tag (git describe) to version a branch build.
@@ -30,58 +33,34 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-      - name: Install
-        run: npm ci
-      - name: Lint (ESLint)
-        run: npm run lint
-      - name: Test (capteurs JavaScript)
-        run: npm run test:js
-      # With a tag (release), it drives every package; without one, the build falls back to
-      # the last tag plus the commit.
-      - name: Build
-        run: npm run build -- ${VERSION:+--release "$VERSION"}
+          cache-dependency-path: browser/package-lock.json
+      - run: make -C browser install
+      - run: make -C browser lint
+      - run: make -C browser test
+      - run: make -C browser build RELEASE="$VERSION"
         env:
           VERSION: ${{ inputs.version }}
-      - name: Lint (Firefox add-on)
-        run: npm run lint:firefox
-      - name: Validate Word add-in manifest
-        run: npm run lint:word
-      - name: Test LibreOffice extension
-        run: npm run test:libreoffice
+      - name: Validation addons.mozilla.org
+        run: make -C browser lint-amo
       # Paquets des stores, repris tels quels par release.yml.
       - uses: actions/upload-artifact@v7
         with:
           name: extension
-          path: dist/*.zip
-      # Extension dépaquetée, par navigateur, pour l'installer à la main : l'artefact téléchargé,
-      # une fois dézippé, est le dossier à charger.
+          path: browser/dist/*.zip
+      # Extension dépaquetée, par navigateur, pour l'installer à la main : l'artefact
+      # téléchargé, une fois dézippé, est le dossier à charger.
       - uses: actions/upload-artifact@v7
         with:
           name: certimens-chrome
-          path: dist/chrome/
+          path: browser/dist/chrome/
       - uses: actions/upload-artifact@v7
         with:
           name: certimens-firefox
-          path: dist/firefox/
-      # Site du complément Word (publié sur GitHub Pages par release.yml) et manifest de test local.
-      - uses: actions/upload-artifact@v7
-        with:
-          name: certimens-word
-          path: |
-            dist/word/
-            dist/word-localhost.xml
-      - uses: actions/upload-artifact@v7
-        with:
-          name: certimens-libreoffice
-          path: dist/libreoffice.oxt
-      - uses: actions/upload-artifact@v7
-        with:
-          name: certimens-vscode
-          path: dist/certimens-vscode.vsix
+          path: browser/dist/firefox/
       - name: Install instructions
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
-          ### Installer ce build à la main ($(cat dist/VERSION))
+          ### Installer ce build à la main ($(cat browser/dist/VERSION))
 
           Télécharger l'artefact en bas de cette page, puis le dézipper :
 
@@ -94,29 +73,101 @@ jobs:
           - **Safari** : \`safari-xcode\` (job macOS) → ouvrir le projet dans Xcode, voir \`docs/extension-navigateur.md\`.
           - **LibreOffice** : \`certimens-libreoffice\` → *Outils › Gestionnaire des extensions ›
             Ajouter* → \`libreoffice.oxt\`, puis redémarrer LibreOffice.
-          - **Word** : \`certimens-word\` dézippé dans \`dist/\` d'un clone du dépôt → \`npm run word:serve\`, puis charger
-            \`word-localhost.xml\` dans Word (voir \`docs/complement-word.md\`).
+          - **Word** : \`certimens-word\` dézippé dans \`word/dist/\` d'un clone du dépôt → \`make -C word serve\`,
+            puis charger \`word-localhost.xml\` dans Word (voir \`docs/complement-word.md\`).
           - **VS Code** : \`certimens-vscode\` → \`code --install-extension certimens-vscode.vsix\`
             (ou *Extensions › … › Installer à partir d'un VSIX*), puis recharger la fenêtre.
           EOF
 
+  word:
+    name: Complément Word
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: word/package-lock.json
+      - run: make -C word install
+      - run: make -C word lint
+      - run: make -C word test
+      - run: make -C word build RELEASE="$VERSION"
+        env:
+          VERSION: ${{ inputs.version }}
+      - name: Validation du manifest Office
+        run: make -C word lint-manifest
+      # Site du complément (publié sur GitHub Pages par release.yml) et manifest de test local.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: certimens-word
+          path: |
+            word/dist/word/
+            word/dist/word-localhost.xml
+
+  libreoffice:
+    name: Extension LibreOffice
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # Rien à installer côté Node : cet agent est en Python de bout en bout, build compris.
+      # ruff s'installe dans libreoffice/.venv depuis requirements-dev.txt ; python3-venv est
+      # déjà sur le runner.
+      - run: make -C libreoffice install
+      - run: make -C libreoffice lint
+      - run: make -C libreoffice test
+      - run: make -C libreoffice build RELEASE="$VERSION"
+        env:
+          VERSION: ${{ inputs.version }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: certimens-libreoffice
+          path: libreoffice/dist/libreoffice.oxt
+
+  vscode:
+    name: Extension VS Code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: vscode/package-lock.json
+      - run: make -C vscode install
+      - run: make -C vscode lint
+      - run: make -C vscode test
+      - run: make -C vscode build RELEASE="$VERSION"
+        env:
+          VERSION: ${{ inputs.version }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: certimens-vscode
+          path: vscode/dist/certimens-vscode.vsix
+
   safari:
     name: Safari (Xcode)
-    needs: extension
+    needs: browser
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           name: extension
-          path: dist
+          path: browser/dist
       - name: Unpack
-        run: unzip -q dist/safari.zip -d dist/safari
+        run: unzip -q browser/dist/safari.zip -d browser/dist/safari
       - name: Convert and build (unsigned)
-        run: scripts/safari.sh
+        run: make -C browser safari
       - name: Pack Xcode project
-        run: ditto -c -k --keepParent dist/safari-xcode dist/safari-xcode.zip
+        run: ditto -c -k --keepParent browser/dist/safari-xcode browser/dist/safari-xcode.zip
       - uses: actions/upload-artifact@v7
         with:
           name: safari-xcode
-          path: dist/safari-xcode.zip
+          path: browser/dist/safari-xcode.zip

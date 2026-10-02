@@ -1,6 +1,6 @@
 # Extension VS Code
 
-Une extension pour **Visual Studio Code** dans `vscode/`, paquet `dist/certimens-vscode.vsix`
+Une extension pour **Visual Studio Code** dans `vscode/`, paquet `vscode/dist/certimens-vscode.vsix`
 (VS Code 1.90+), pour les devoirs qui se rendent en code plutôt qu'en traitement de texte.
 
 C'est le seul agent qui mesure **un projet entier, fichier par fichier** : chaque fichier écrit
@@ -57,13 +57,13 @@ la mesure, elle, n'envoie que des compteurs.
 ## Installer
 
 ```bash
-code --install-extension dist/certimens-vscode.vsix
+code --install-extension vscode/dist/certimens-vscode.vsix
 ```
 
-Ou *Extensions › … › Installer à partir d'un VSIX*. En développement, `npm run vscode:dev`
-construit le paquet et ouvre une fenêtre VS Code sur `dist/vscode/` — le dossier `vscode/` seul
-ne suffit pas, `media/` (la feuille de style, les polices et l'icône partagées avec l'extension
-navigateur) est rempli par le build.
+Ou *Extensions › … › Installer à partir d'un VSIX*. En développement, `make -C vscode dev`
+ouvre une fenêtre VS Code sur le dossier `vscode/` lui-même, sans rien construire : `media/`
+(la feuille de style, les polices et l'icône partagées avec l'extension navigateur) y est fait
+de **liens symboliques** vers `browser/`, que l'hôte d'extension suit comme des fichiers.
 
 ## Côté moteur
 

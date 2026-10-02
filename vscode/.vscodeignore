@@ -1,0 +1,15 @@
+# Ce que le .vsix ne doit pas emporter. C'est le mécanisme de VS Code pour ça : le build ne
+# recopie plus l'agent dans un dossier intermédiaire, vsce empaquette ce dossier-ci tel quel.
+#
+# Ce qui part dans le paquet : src/ (le code et media/), package.json et les deux
+# package.nls*.json qui le traduisent, README.md (la page du Marketplace), LICENSE et NOTICE.
+.vscode/**
+.vscodeignore
+tests/**
+store/**
+node_modules/**
+dist/**
+Makefile
+build.mjs
+eslint.config.mjs
+package-lock.json

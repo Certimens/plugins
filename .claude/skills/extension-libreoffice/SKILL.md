@@ -28,7 +28,8 @@ extensions.libreoffice.org : il ne change plus.
 ## Règles PyUNO
 
 - **Rien ne doit remonter dans LibreOffice.** Une exception qui traverse un écouteur UNO peut
-  emporter la session : les points d'entrée rattrapent (`except Exception as err: print('Certimens:', err)`).
+  emporter la session : les points d'entrée rattrapent
+  (`except Exception as err: print('Certimens:', err)`).
 - **Aucun réseau sur le fil de l'interface.** `engine.py` envoie depuis un fil dédié, et les
   fenêtres de `dialogs.py` appellent le moteur de la même façon : sinon LibreOffice reste figé le
   temps de la réponse.
@@ -48,15 +49,15 @@ extensions.libreoffice.org : il ne change plus.
 `measure.py` et `engine.py` **n'importent pas `uno`** — c'est délibéré, et c'est ce qui rend les
 tests exécutables en CI. Toute logique de mesure ou d'envoi va dans ces deux modules ; `sensor.py`
 et `dialogs.py` ne font que les câbler à LibreOffice. Introduire un `import uno` dans `measure.py`
-ou `engine.py` casse `npm run test:libreoffice`.
+ou `engine.py` casse `make -C libreoffice test`.
 
 **Bibliothèque standard uniquement** : aucune dépendance tierce (`urllib.request`, pas
 `requests`). C'est pourquoi Dependabot ne suit rien côté Python.
 
 ```bash
-npm run test:libreoffice   # python3 -m unittest discover -s libreoffice/tests
-npm run build              # dist/libreoffice.oxt
-unopkg add dist/libreoffice.oxt   # puis redémarrer LibreOffice
+make -C libreoffice test    # python3 -m unittest discover -s tests
+make -C libreoffice build   # dist/libreoffice.oxt
+unopkg add libreoffice/dist/libreoffice.oxt   # puis redémarrer LibreOffice
 ```
 
 Les tests sont en `unittest` (stdlib) et jouent des scénarios de frappe horodatés :

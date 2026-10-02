@@ -1,0 +1,248 @@
+/* Shared styles for the popup, the options page, the Word task pane and the VS Code panel. They
+   follow the same art direction as the Certimens web space, whose brand guidelines are the
+   reference (docs/developpement.md points at them): Plus Jakarta Sans with heavy headings over a
+   medium body, slate as the dominant color, brass gold as the single accent, flat surfaces on a
+   hairline.
+
+   Two schemes, and every color goes through a token so that a rule is written once. The dark
+   one is not an invention: it is the same ramp read from the other end — slate becomes the
+   page, and what was the dominant color becomes the light end that writes on it. Only one
+   value genuinely differs, the accent *as text* (--accent-text): dark brass on a light page,
+   light brass on a dark one. The accent *as a surface* never changes — gold carrying ink, in
+   both schemes. */
+
+@font-face { font-family: 'Plus Jakarta Sans'; font-weight: 400; font-display: swap; src: url('fonts/plus-jakarta-sans-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Plus Jakarta Sans'; font-weight: 600; font-display: swap; src: url('fonts/plus-jakarta-sans-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Plus Jakarta Sans'; font-weight: 700; font-display: swap; src: url('fonts/plus-jakarta-sans-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Plus Jakarta Sans'; font-weight: 800; font-display: swap; src: url('fonts/plus-jakarta-sans-latin-800-normal.woff2') format('woff2'); }
+
+:root {
+    /* Tells the browser which scheme its own surfaces belong to: scrollbars, native controls,
+       the form widgets we do not paint ourselves. */
+    color-scheme: light;
+
+    /* Slate: the dominant color, and what every outlined control is made of. */
+    --primary: #1e293b;
+    --primary-soft: rgb(30 41 59 / 8%);
+    --primary-line: rgb(30 41 59 / 50%);
+    /* Brass gold: the single accent — the word mark, highlights, and the one filled button a
+       view is allowed. It is never text on a light page (2.46:1); where it has to read as text
+       — the links — the dark brass is used (5.7:1). As a surface it carries ink (6.6:1), and
+       that pair is the same in both schemes. */
+    --accent: #c5a059;
+    --accent-hover: #d4ac5f;
+    --accent-text: #705e3a;
+    --accent-ink: #1a202c;
+    --bg: #f8fafc;
+    --paper: #fff;
+    --text: #1a202c;
+    --text-secondary: #54595f;
+    --divider: #e5e5e5;
+    --border: rgb(0 0 0 / 23%);
+    --disabled-text: rgb(0 0 0 / 26%);
+    --disabled-bg: rgb(0 0 0 / 12%);
+    /* Verdict colors carry meaning rather than brand: they stay outside the guidelines. */
+    --success: #137333;
+    --success-wash: #edf7ed;
+    --success-text: #1e4620;
+    --warning: #b06000;
+    --error: #c5221f;
+    --error-wash: #fdeded;
+    --error-text: #5f2120;
+    --info-wash: #e5f6fd;
+    --info-text: #014361;
+    --radius: 12px;
+}
+
+/* The dark scheme, as one block of token values. It is applied by three triggers below, and
+   the values are written once here so the three can never drift apart. */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+        color-scheme: dark;
+        --primary: #cbd5e1;
+        --primary-soft: rgb(203 213 225 / 12%);
+        --primary-line: rgb(203 213 225 / 50%);
+        --accent-text: #d4ac5f;
+        --bg: #0f172a;
+        --paper: #1e293b;
+        --text: #f1f5f9;
+        --text-secondary: #94a3b8;
+        --divider: #334155;
+        --border: rgb(255 255 255 / 23%);
+        --disabled-text: rgb(255 255 255 / 30%);
+        --disabled-bg: rgb(255 255 255 / 12%);
+        --success: #4ade80;
+        --success-wash: rgb(74 222 128 / 12%);
+        --success-text: #4ade80;
+        --warning: #fb923c;
+        --error: #f87171;
+        --error-wash: rgb(248 113 113 / 12%);
+        --error-text: #f87171;
+        --info-wash: rgb(125 211 252 / 12%);
+        --info-text: #7dd3fc;
+    }
+}
+
+/* Same values, chosen rather than inherited. `data-theme` is what a host sets when it knows
+   better than the operating system: the VS Code panel follows the editor's theme, not the
+   desktop's, and ui.js sets it from the student's own choice where there is one. */
+:root[data-theme='dark'] {
+    color-scheme: dark;
+    --primary: #cbd5e1;
+    --primary-soft: rgb(203 213 225 / 12%);
+    --primary-line: rgb(203 213 225 / 50%);
+    --accent-text: #d4ac5f;
+    --bg: #0f172a;
+    --paper: #1e293b;
+    --text: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --divider: #334155;
+    --border: rgb(255 255 255 / 23%);
+    --disabled-text: rgb(255 255 255 / 30%);
+    --disabled-bg: rgb(255 255 255 / 12%);
+    --success: #4ade80;
+    --success-wash: rgb(74 222 128 / 12%);
+    --success-text: #4ade80;
+    --warning: #fb923c;
+    --error: #f87171;
+    --error-wash: rgb(248 113 113 / 12%);
+    --error-text: #f87171;
+    --info-wash: rgb(125 211 252 / 12%);
+    --info-text: #7dd3fc;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    /* The weight contrast is the most recognizable trait: body 500, headings 800. */
+    font-weight: 500;
+    line-height: 1.5;
+}
+
+[hidden] { display: none !important; }
+
+h1 { margin: 0; font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em; }
+h2 { margin: 0; font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em; }
+p { margin: 0; }
+
+/* Brand block: the gold shield, then the word mark with its second half in gold. */
+.brand { display: flex; align-items: center; gap: 8px; }
+.brand .mark { width: 28px; height: 28px; }
+.brand .mens { color: var(--accent); }
+.brand .version { align-self: flex-end; padding-bottom: 3px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+
+.muted { color: var(--text-secondary); }
+.small { font-size: 12px; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Flat surfaces separated by a hairline, as the site's sections are — not floating cards. */
+.card {
+    background: var(--paper);
+    border: 1px solid var(--divider);
+    border-radius: var(--radius);
+    padding: 24px;
+}
+
+/* MUI's outlined field: label above, border turning to the primary color on focus. */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.field input, .field select {
+    width: 100%;
+    padding: 12px 14px;
+    font: inherit;
+    font-size: 15px;
+    color: var(--text);
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    outline: none;
+}
+.field input:hover, .field select:hover { border-color: var(--text); }
+.field input:focus, .field select:focus { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+
+/* A filled button is the call to action, and the brand's call to action is a gold surface with
+   ink text — the rule the whole product shares (see the charter in the `website` repo). One per
+   view, the action the view exists for: the popup shows the login submit or the document action,
+   never both. Everything else is .btn.outlined, in slate, because gold outside a surface is
+   2.46:1 on white. */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 22px;
+    min-height: 40px;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent-ink);
+    background: var(--accent);
+    border: 0;
+    border-radius: var(--radius);
+    cursor: pointer;
+    text-decoration: none;
+}
+.btn:hover { background: var(--accent-hover); }
+.btn:disabled { color: var(--disabled-text); background: var(--disabled-bg); cursor: default; }
+.btn.block { width: 100%; }
+label.btn.disabled { opacity: 0.5; pointer-events: none; }
+.btn.outlined { color: var(--primary); background: transparent; box-shadow: inset 0 0 0 1px var(--primary-line); }
+.btn.outlined:hover { background: var(--primary-soft); box-shadow: inset 0 0 0 1px var(--primary); }
+
+/* Icon-only actions, in the header: they buy back the width a popup does not have. An icon alone
+   names nothing, so each one carries an aria-label (what it does) and a title (what happens if
+   you press it) — and the state they toggle is never theirs alone to tell: the suspended
+   measurement keeps its banner in plain words. 32px is the smallest comfortable target here. */
+.icon-actions { display: flex; gap: 2px; margin-left: auto; }
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    color: var(--text-secondary);
+    background: transparent;
+    cursor: pointer;
+}
+.icon-btn:hover { color: var(--text); background: var(--primary-soft); }
+/* Keyboard focus stays visible: these are the only controls of the header. */
+.icon-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+/* Pressed = measurement suspended. The colour seconds the banner, it never replaces it. */
+.icon-btn[aria-pressed='true'] { color: var(--error); background: var(--error-wash); }
+.icon-btn svg { width: 18px; height: 18px; display: block; }
+/* `hidden` is an HTML attribute: the user-agent rule that acts on it does not reach into SVG,
+   so the swap between the pause and the play icon is spelled out here. */
+.icon-btn svg[hidden] { display: none; }
+
+/* Links read as brass rather than slate, and underline on hover only — the engine's MuiLink. */
+.link {
+    padding: 0;
+    font: inherit;
+    font-weight: 600;
+    color: var(--accent-text);
+    background: none;
+    border: 0;
+    cursor: pointer;
+    text-decoration: none;
+}
+a { color: var(--accent-text); font-weight: 600; text-decoration: none; }
+.link:hover, a:hover { text-decoration: underline; }
+
+/* MUI's standard alert. */
+.alert { padding: 8px 16px; border-radius: var(--radius); font-weight: 500; }
+.alert:empty { display: none; }
+.alert.ok { color: var(--success-text); background: var(--success-wash); }
+.alert.error { color: var(--error-text); background: var(--error-wash); }
+.alert.info { color: var(--info-text); background: var(--info-wash); }
+
+.status { display: flex; flex-direction: column; gap: 4px; }
+.status div:first-child { font-weight: 700; }

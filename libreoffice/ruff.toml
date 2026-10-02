@@ -1,0 +1,42 @@
+# ruff for the LibreOffice extension. Every exception below says why it is one.
+#
+# The extension itself depends on the standard library alone: ruff is a developer tool, it is
+# installed in .venv from requirements-dev.txt, and build.mjs keeps it out of the .oxt.
+
+line-length = 120
+
+[lint]
+# S is flake8-bandit: this agent holds an access token, writes it to disk and talks HTTP, so
+# the security rules earn their place. A, C4, G, ISC, LOG, PIE and RET found nothing the day
+# they were added — they are here to keep it that way.
+select = ["E", "W", "F", "I", "A", "B", "C4", "G", "ISC", "LOG", "PIE", "RET", "S", "SIM", "UP", "RUF"]
+ignore = [
+    # The interface strings are French and English prose: « », ’ and … are what the student
+    # must read, not look-alikes slipped into an identifier.
+    "RUF001", "RUF002", "RUF003",
+    # `try/except: pass` around a UNO call always carries the comment that says which failure
+    # is expected; contextlib.suppress would move that reason into the header. S110 says the
+    # same thing as SIM105, from the security angle.
+    "SIM105", "S110",
+    # %-formatting is the form `logging` itself takes, and the agent stays plain.
+    "UP031",
+    # Nothing in this code base is annotated, so there is no ClassVar to hang on a mutable
+    # class attribute.
+    "RUF012",
+]
+
+[lint.isort]
+known-first-party = ["certimens_agent"]
+# LibreOffice provides these; they are importable only inside its own Python.
+known-third-party = ["com", "uno", "unohelper"]
+
+[lint.per-file-ignores]
+# i18n.py is the dictionary: one line per message, and a message is a whole sentence shown to
+# the student. Wrapping them would only hide them.
+"src/pythonpath/certimens_agent/i18n.py" = ["E501"]
+# The tests are not the product: the fake engine carries a fake password, and one of them
+# shells out to `node` on purpose, to read the browser agent's dictionary and compare it.
+"tests/*.py" = ["S105", "S603", "S607"]
+# The build is a developer tool, not something the student runs: it asks git for the version,
+# with literal arguments and git taken from PATH, which is what a build is supposed to do.
+"build.py" = ["S603", "S607"]

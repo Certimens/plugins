@@ -68,7 +68,7 @@ connaît pas la pause, et c'est voulu.
 
 ## Langues
 
-`vscode/i18n.js` porte les textes que notre code affiche ; `package.nls.json` (français, le repli)
+`vscode/src/i18n.js` porte les textes que notre code affiche ; `package.nls.json` (français, le repli)
 et `package.nls.en.json` ceux que l'éditeur lit dans `package.json` avant nous — d'où les `%clé%`.
 Les messages propres à l'éditeur ont leur espace de noms : `bar.*` pour la barre d'état, `notify.*`
 pour les notifications, parce qu'ils disent la même chose que le volet mais avec les icônes de
@@ -94,13 +94,13 @@ compte son volume sans les sauts de ligne
 ## Construire et essayer
 
 ```bash
-npm run vscode:dev   # build puis une fenêtre VS Code sur dist/vscode/
-npm test             # dont tests/vscode-sensor.test.mjs
+make -C vscode dev    # une fenêtre VS Code sur le dossier lui-même, sans construire
+make -C vscode test   # tests/vscode-sensor.test.mjs et vscode-panel.test.mjs
 ```
 
-Le dossier `vscode/` **seul ne se charge pas** : `media/ui.css`, `media/fonts/` et
-`media/icon128.png` viennent de `extension/` et sont copiés par `scripts/build.mjs`. Seul
-`media/shield.svg` (l'icône monochrome de la barre d'activité) est versionné.
+`media/ui.css`, `media/fonts/` et `media/icon128.png` sont des **liens symboliques** vers
+`browser/` : le dossier se charge tel quel (`code --extensionDevelopmentPath=.`), et vsce les
+déréférence en construisant le `.vsix` (`--follow-symlinks`). Seul `media/shield.svg` (l'icône monochrome de la barre d'activité) est à lui.
 
 La version vient du tag git, comme partout : `vscode/package.json` n'en porte qu'un repli, et le
 Marketplace n'accepte que `X.Y.Z` — un build de branche (`X.Y.Z-commit`) n'est pas publiable,

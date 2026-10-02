@@ -5,10 +5,10 @@ lisible** de ce que comptent les agents ; les détails propres à chacun sont da
 
 | Agent | Fenêtres de mesure | Capteur |
 | --- | --- | --- |
-| Extension navigateur | `extension/content.js` | le même fichier (clavier et souris) |
-| Complément Word | `word/sensor.js` | le même fichier (différences de texte) |
-| Extension LibreOffice | `libreoffice/pythonpath/certimens_agent/measure.py` | `sensor.py` (UNO) |
-| Extension VS Code | `vscode/sensor.js` | le même fichier (modifications du document) |
+| Extension navigateur | `browser/src/content.js` | le même fichier (clavier et souris) |
+| Complément Word | `word/src/sensor.js` | le même fichier (différences de texte) |
+| Extension LibreOffice | `libreoffice/src/pythonpath/certimens_agent/measure.py` | `sensor.py` (UNO) |
+| Extension VS Code | `vscode/src/sensor.js` | le même fichier (modifications du document) |
 
 Une règle changée dans l'une doit l'être dans les trois autres, ou être justifiée par une limite
 de la plateforme (voir *Écarts assumés*).
@@ -112,9 +112,9 @@ navigateur que dans un éditeur.
 
 - **Complément Word** : pas de `mad_ms`, `median_flight_ms` ni `focus_losses`. Office ne livre ni
   les frappes (le capteur travaille par différences de texte), ni la sortie du document, ni
-  l'enregistrement ; une cadence calculée sur ses événements serait fausse. Une « frappe » y est un caractère inséré ou
-  effacé. N'ayant jamais compté que des différences, il n'a jamais eu le biais du clic et voyait
-  déjà le remplacement d'une sélection.
+  l'enregistrement ; une cadence calculée sur ses événements serait fausse. Une « frappe » y
+  est un caractère inséré ou effacé. N'ayant jamais compté que des différences, il n'a jamais
+  eu le biais du clic et voyait déjà le remplacement d'une sélection.
 - **LibreOffice** : mêmes metrics et mêmes définitions que l'extension, flight times compris
   (`XUserInputInterception` donne le clavier et la souris) ; seule exception, son gestionnaire de
   clic ne donne pas de coordonnées, donc une sélection **tracée à la souris** n'y est pas
@@ -154,10 +154,10 @@ document.
 
 | Agent | Où l'état est gardé | Où les événements sont filtrés |
 | --- | --- | --- |
-| Extension navigateur | `chrome.storage.local`, clé `paused` | `extension/content.js` (chaque gestionnaire, et `recordInjection`) |
-| Complément Word | `localStorage` partagé, `isPaused()` d'`agent.js` | `word/sensor.js` (`noteLocalEvent`, `onSelectionChanged`) |
+| Extension navigateur | `chrome.storage.local`, clé `paused` | `browser/src/content.js` (chaque gestionnaire, et `recordInjection`) |
+| Complément Word | `localStorage` partagé, `isPaused()` d'`agent.js` | `word/src/sensor.js` (`noteLocalEvent`, `onSelectionChanged`) |
 | Extension LibreOffice | `certimens.json`, `Engine.paused()` | `sensor.py` (`on_key`, `on_click`, `on_paste`, `on_deactivated`) |
-| Extension VS Code | `globalState`, `Agent.paused()` | `vscode/extension.js` (les gestionnaires de l'hôte) |
+| Extension VS Code | `globalState`, `Agent.paused()` | `vscode/src/extension.js` (les gestionnaires de l'hôte) |
 
 Le complément Word est le seul cas où la lecture du document **continue** pendant la pause : son
 capteur travaille par différences, et sans rafraîchir sa référence, tout ce qui a été écrit
@@ -187,7 +187,7 @@ l'`unmeasured_ratio` du document — la part qu'aucune mesure n'explique. Un dev
 
 Aucune touche, aucun caractère, aucun texte ne quitte le poste ni n'est conservé au-delà de ce
 qu'exige le calcul. Les capteurs traduisent chaque touche en **catégorie** (`erase`,
-`navigation`, `modifier`, `other`) puis l'oublient ; `word/sensor.js` ne garde que la lecture
+`navigation`, `modifier`, `other`) puis l'oublient ; `word/src/sensor.js` ne garde que la lecture
 précédente du texte, le temps d'en faire la différence. Le mode debug journalise **des compteurs
 et des catégories uniquement**.
 

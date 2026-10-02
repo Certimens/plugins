@@ -1,18 +1,18 @@
 ---
 name: extension-navigateur
-description: Extension navigateur MV3 de Certimens (extension/, un seul manifest pour Chrome, Firefox, Safari, Edge et Opera) — service worker, content scripts, permissions, empaquetage par navigateur et contraintes des boutiques. À charger avant toute modification dans extension/, scripts/build.mjs ou eslint.config.js, et avant de toucher au manifest ou aux permissions.
+description: Extension navigateur MV3 de Certimens (browser/, un seul manifest pour Chrome, Firefox, Safari, Edge et Opera) — service worker, content scripts, permissions, empaquetage par navigateur et contraintes des boutiques. À charger avant toute modification dans browser/, y compris son build.mjs ou sa configuration de lint, et avant de toucher au manifest ou aux permissions.
 ---
 
 # Extension navigateur (MV3)
 
-`extension/` mesure la rédaction dans Google Docs et Word Online. `content.js` est le capteur
+`browser/` mesure la rédaction dans Google Docs et Word Online. `content.js` est le capteur
 (voir la skill `mesures-redaction`), `background.js` le service worker qui pousse vers le moteur,
 `popup.js` / `options.js` les pages, `ui.js` / `ui.css` le socle partagé avec le complément Word.
 
 ## Un seul manifest, trois paquets
 
-`extension/manifest.json` sert tous les navigateurs **et le chargement non empaqueté**.
-`scripts/build.mjs` n'en garde, pour chaque cible, que ce qu'elle comprend :
+`browser/src/manifest.json` sert tous les navigateurs **et le chargement non empaqueté**.
+`browser/build.mjs` n'en garde, pour chaque cible, que ce qu'elle comprend :
 
 - **Chrome et Safari** : `background.service_worker` seul, pas de `browser_specific_settings` ;
 - **Firefox** : `background.scripts` seul ;
@@ -31,12 +31,12 @@ La version vient de git. Release (tag `vX.Y.Z`) → `X.Y.Z` ; sinon dernier tag 
 ## Contraintes des boutiques
 
 - `description` ≤ **132 caractères** : au-delà le Chrome Web Store et Opera refusent le paquet,
-  et le build échoue avant eux (contrôle en tête de `scripts/build.mjs`).
+  et le build échoue avant eux (contrôle en tête de `browser/build.mjs`).
 - Firefox exige `browser_specific_settings.gecko` : `id` stable, `strict_min_version`, et
-  `data_collection_permissions` à jour de ce que l'extension collecte réellement. `npm run
-  lint:firefox` (après build) traite les avertissements AMO comme des erreurs.
+  `data_collection_permissions` à jour de ce que l'extension collecte réellement.
+  `make -C browser lint-amo` (après build) traite les avertissements AMO comme des erreurs.
 - **Aucun code distant** : tout est empaqueté, pas de `<script src>` externe, pas d'`eval`. Les
-  polices sont livrées dans `extension/fonts/`.
+  polices sont livrées dans `browser/src/fonts/`.
 - Permissions au plus juste : `storage` et `alarms`, plus les hôtes des éditeurs et du moteur.
   Un moteur personnalisé (`http://localhost:8080`) passe par `optional_host_permissions`,
   demandé à l'exécution — ne pas élargir `host_permissions` pour s'en dispenser.
@@ -45,7 +45,8 @@ La version vient de git. Release (tag `vX.Y.Z`) → `X.Y.Z` ; sinon dernier tag 
 
 `sourceType: 'script'` : `popup.js` et `options.js` consomment les fonctions déclarées par
 `ui.js`, chargé avant eux. Il n'y a ni `import` ni bundler. Une fonction partagée nouvelle doit
-être **déclarée dans `ui.js` et ajoutée aux globals d'`eslint.config.js`**, sinon le lint casse.
+être **déclarée dans `ui.js` et ajoutée aux globals de `browser/eslint.config.mjs`** — et, si le
+volet Word s'en sert, à ceux de `word/eslint.config.mjs` — sinon le lint casse.
 
 ## Service worker
 
@@ -76,9 +77,10 @@ laisser seules porter l'information.
 ## Vérifier
 
 ```bash
-npm run lint           # ESLint
-npm run build          # dist/{chrome,firefox,safari}.zip, dist/word/, dist/libreoffice.oxt
-npm run lint:firefox   # validation AMO du paquet Firefox (après build)
+make -C browser lint       # ESLint, Stylelint (ui.css), html-validate
+make -C browser build      # dist/{chrome,firefox,safari}.zip
+make build                 # tous les paquets, les quatre agents
+make -C browser lint-amo   # validation AMO du paquet Firefox (après build)
 ```
 
 ## Mesure suspendue
@@ -91,7 +93,7 @@ que c'est là que le comptage a lieu.
 
 ## Langues
 
-`extension/i18n.js` porte les textes de l'interface (partagé avec le complément Word, copié par
+`browser/src/i18n.js` porte les textes de l'interface (partagé avec le complément Word, copié par
 le build), `_locales/{fr,en}/messages.json` ceux que le navigateur et la boutique lisent avant
 notre code — d'où `__MSG_extensionName__` et `default_locale` dans le manifest. Le service worker
 charge le dictionnaire par `importScripts` ; Firefox le charge par `background.scripts`, où

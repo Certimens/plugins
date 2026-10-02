@@ -55,5 +55,8 @@ Deux règles pratiques en découlent :
   l'étudiant existent en français **et** en anglais (voir [langues.md](langues.md)).
 - Pas de bundler, pas de framework : des scripts classiques côté JavaScript, la bibliothèque
   standard seule côté Python.
+- **Un dossier par agent**, avec son `Makefile` et ses linters ; ce que les quatre partagent
+  vit dans `browser/` et leur arrive par des liens symboliques (voir
+  [developpement.md](developpement.md)).
 - La version vient de git : elle ne s'incrémente jamais à la main dans un manifest (voir
   [developpement.md](developpement.md)).

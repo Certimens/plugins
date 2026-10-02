@@ -12,14 +12,15 @@ poste.
 
 | Agent | Où il mesure | Paquet |
 | --- | --- | --- |
-| [`extension/`](docs/extension-navigateur.md) | Google Docs, Word Online | MV3 — Chrome, Firefox, Safari, Edge, Opera |
+| [`browser/`](docs/extension-navigateur.md) | Google Docs, Word Online | MV3 — Chrome, Firefox, Safari, Edge, Opera |
 | [`word/`](docs/complement-word.md) | Word (Windows, Mac, web) | complément Office servi par GitHub Pages |
 | [`libreoffice/`](docs/extension-libreoffice.md) | LibreOffice Writer | `.oxt` (Python / UNO) |
 | [`vscode/`](docs/extension-vscode.md) | Visual Studio Code, fichier par fichier | `.vsix` |
 
-Le reste du dépôt : `scripts/` (build des paquets, certificat de dev Word, visuels de marque),
-`store/` (visuels et textes des fiches des boutiques), `tests/` (les capteurs, sans hôte), et
-`legacy/` (anciens agents de bureau, conservés pour référence — ne pas faire évoluer).
+Les quatre dossiers ont la même forme : `src/` (ce qui est livré), `tests/`, `store/` (une
+fiche par boutique), et l'outillage de l'agent autour. Le reste du dépôt : `scripts/` (la
+marque et le script qui régénère icônes et visuels) et `legacy/` (anciens agents de bureau,
+conservés pour référence — ne pas faire évoluer).
 
 ## Documentation
 
@@ -42,11 +43,16 @@ La documentation se met à jour **dans le même commit** que le code qu'elle dé
 ## Démarrage rapide
 
 ```bash
-npm ci
-npm run lint              # ESLint (extension/, word/, vscode/, scripts/, tests/)
-npm test                  # toute la suite, sans navigateur, sans Word, sans LibreOffice, sans VS Code
-npm run build             # tous les paquets dans dist/
+make install              # installe l'outillage de chaque projet (à faire une fois)
+make                      # lint puis tests, agent par agent
+make build                # chaque agent construit son paquet dans <agent>/dist/
 ```
+
+Le dépôt contient **quatre projets autonomes**, un par agent : chacun déclare son outillage et
+porte son `Makefile`, ses linters, ses tests et son build — `make -C word lint`,
+`make -C libreoffice test`, `make -C browser build`… `make` à la racine les parcourt tous, et
+n'a rien d'autre à lui. Dans les trois agents JavaScript, `npm run` liste aussi tout ce que
+l'agent sait faire ([docs/developpement.md](docs/developpement.md)).
 
 Charger un agent dans son hôte : voir sa page ci-dessus. Pour travailler contre un moteur local,
 saisir `http://localhost:8080` comme adresse du moteur.
@@ -60,3 +66,18 @@ Ce dépôt est **autonome** : il se lit, se teste et se construit seul. Le moteu
 mesures, calcule le score et sert l'espace web est développé à part et n'est pas public — rien
 ici n'y renvoie. Ce qu'un agent attend de lui passe entièrement par son API, décrite du point de
 vue des agents dans [docs/moteur.md](docs/moteur.md).
+
+## Licence
+
+**Apache License 2.0** — voir [LICENSE](LICENSE) et [NOTICE](NOTICE). Le code des quatre agents
+est libre de lecture, de modification et de redistribution, y compris pour un usage commercial.
+
+Deux précisions :
+
+- La licence porte sur **le code, pas sur la marque** (clause 6) : elle ne concède aucun droit
+  sur le nom « Certimens » ni sur l'écu doré. Un dérivé se distribue sous un autre nom.
+- Les polices **Plus Jakarta Sans**, livrées dans les paquets, sont sous SIL Open Font License
+  1.1 : leur licence les accompagne dans [`browser/src/fonts/LICENSE`](browser/src/fonts/LICENSE).
+
+Chaque agent porte un lien vers ce `LICENSE`, et chaque paquet l'emporte : l'extension, le
+`.oxt`, le `.vsix` et le site du complément Word en contiennent une copie réelle.

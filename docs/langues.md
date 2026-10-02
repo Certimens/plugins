@@ -24,10 +24,10 @@ de ses e-mails.
 
 | Agent | Textes de l'interface | Fiche et manifest |
 | --- | --- | --- |
-| Navigateur | `extension/i18n.js` | `extension/_locales/{fr,en}/messages.json` (`__MSG_…__` dans le manifest) |
-| Word | `extension/i18n.js`, partagé et copié par le build | `<Override Locale="en-us">` dans `word/manifest.xml` |
-| LibreOffice | `libreoffice/pythonpath/certimens_agent/i18n.py` | `description.xml` et `description/description-{fr,en}.txt` |
-| VS Code | `vscode/i18n.js` | `vscode/package.nls.json` (français, le repli) et `package.nls.en.json` |
+| Navigateur | `browser/src/i18n.js` | `browser/src/_locales/{fr,en}/messages.json` (`__MSG_…__` dans le manifest) |
+| Word | `browser/src/i18n.js`, partagé et copié par le build | `<Override Locale="en-us">` dans `word/src/manifest.xml` |
+| LibreOffice | `libreoffice/src/pythonpath/certimens_agent/i18n.py` | `description.xml` et `description/description-{fr,en}.txt` |
+| VS Code | `vscode/src/i18n.js` | `vscode/package.nls.json` (français, le repli) et `package.nls.en.json` |
 
 Aucune page ne porte de texte en dur : `data-i18n="clé"` côté extension et Word, injection à la
 construction côté VS Code.
@@ -59,12 +59,19 @@ le navigateur le français. Rien d'autre n'est possible pour un texte que l'hôt
 
 ## Vérifier
 
-Les suites vérifient la parité des clés, les variables (`{title}`, `{count}`) et le fait qu'une
-clé commune à deux agents porte bien le **même** message : `tests/i18n.test.mjs` et
+Chaque agent vérifie **son** dictionnaire : parité des clés, variables (`{title}`, `{count}`),
+règle de choix de la langue — `browser/tests/i18n.test.mjs`, `vscode/tests/i18n.test.mjs`,
 `libreoffice/tests/test_i18n.py`.
+
+Le dictionnaire du navigateur est la **référence** : le volet Word pointe sur ce fichier par un
+lien symbolique, et les deux autres en tiennent une copie. Ce sont donc **les copies** qui
+vérifient leur accord avec lui — une clé commune doit porter le même message des deux côtés,
+sinon l'étudiant lira deux phrases différentes pour un même état.
 
 ## Ajouter une langue
 
 Cela commence **côté moteur** : il n'en connaît que deux, et l'étudiant choisirait sinon dans
-son espace une langue que le moteur refuse d'enregistrer. Les quatre dictionnaires, les fiches
-des boutiques et les manifests suivent.
+son espace une langue que le moteur refuse d'enregistrer. Les quatre dictionnaires, les
+manifests et les fiches des boutiques suivent — ces dernières se remplissent langue par langue
+dans chaque tableau de bord, aucune boutique ne les déduit du paquet (textes dans
+`<agent>/store/<boutique>/`).

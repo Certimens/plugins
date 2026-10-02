@@ -2,20 +2,26 @@
 
 ## Les workflows
 
-- **CI** (`.github/workflows/ci.yml`) : lint, build et validation Firefox sur chaque branche et
-  PR ; les zips sont joints au run (artefact `extension`), comme le `.oxt` LibreOffice et le
+- **CI** (`.github/workflows/ci.yml`) : **un job par projet** — chacun installe son outillage
+  et appelle son propre `Makefile`, comme on le ferait en local, plus un job pour la
+  documentation. Un agent qui casse ne masque pas les autres. Les zips du
+  navigateur sont joints au run (artefact `extension`), comme le `.oxt` LibreOffice et le
   `.vsix` VS Code (artefacts `certimens-libreoffice` et `certimens-vscode`). Un job macOS
   convertit le paquet Safari, compile l'app sans signature et joint le projet Xcode (artefact
   `safari-xcode`).
 - **Dépendances** (`.github/dependabot.yml`) : Dependabot suit chaque lundi les paquets npm de
   l'outillage et les actions des workflows (mises à jour mineures et correctives groupées,
-  majeures séparées). Rien pour l'extension LibreOffice : son code Python n'a que la
-  bibliothèque standard.
+  majeures séparées). Chaque projet ayant son `package-lock.json`, il y a un `package-ecosystem`
+  par dossier. Côté LibreOffice, le suivi porte sur `requirements-dev.txt` (ruff) : le code
+  livré, lui, n'a que la bibliothèque standard.
 - **Pages** (`.github/workflows/pages.yml`) : publie le site du complément Word à la demande,
   sans release ni tag (voir [complement-word.md](complement-word.md)). Même cible que la
   release, un seul déploiement à la fois (groupe de concurrence `github-pages`).
 - **Release** (`.github/workflows/release.yml`) : un tag `vX.Y.Z` relance la CI, qui construit
-  **une seule fois** les paquets de tous les navigateurs.
+  **une seule fois** les paquets, puis publie. La publication elle-même est une cible du
+  `Makefile` de l'agent concerné — `make -C browser publish-chrome`,
+  `make -C vscode publish` — et le workflow ne fait que fournir les identifiants et sauter les
+  boutiques non configurées. La même commande marche donc à la main.
 
 ## Publier une version
 
@@ -35,7 +41,8 @@ Ensuite, le workflow de release :
    étudiants ont la nouvelle version à la prochaine ouverture de Word, sans repasser par
    AppSource tant que le manifest ne change pas ;
 3. joint l'extension LibreOffice (`certimens-agent-X.Y.Z-libreoffice.oxt`), à déposer à la main
-   sur extensions.libreoffice.org ;
+   sur extensions.libreoffice.org, qui n'a pas d'API
+   ([`libreoffice/store/`](../libreoffice/store/)) ;
 4. joint l'extension VS Code (`certimens-agent-X.Y.Z-vscode.vsix`) et la publie sur le Visual
    Studio Marketplace si `VSCE_PAT` est configuré. Le Marketplace n'accepte que des versions
    `X.Y.Z` : un build de branche, versionné `X.Y.Z-commit`, n'est donc jamais publiable — c'est
@@ -57,15 +64,19 @@ La **première** publication se fait à la main dans chaque store ; la CI ne sai
 jour une extension existante. Chaque fiche demande une adresse d'assistance : partout
 `contact@certimens.fr`, avec `https://certimens.fr` comme site. Les paquets portent le nom et la
 description dans les deux langues, mais **aucune boutique ne traduit la fiche à partir du
-paquet** : chacune a un onglet par langue, à remplir à la main (textes dans `store/`).
+paquet** : chacune a un onglet par langue, à remplir à la main. **Les textes de chaque fiche
+vivent chez l'agent concerné**, un dossier par boutique :
+[`browser/store/`](../browser/store/), [`word/store/`](../word/store/),
+[`libreoffice/store/`](../libreoffice/store/), [`vscode/store/`](../vscode/store/). Ce qui suit
+n'est que la mise en place des comptes et des identifiants.
 
 ### Chrome Web Store
 
 1. Créer un compte développeur (frais uniques de 5 $) sur le
    [tableau de bord](https://chrome.google.com/webstore/devconsole).
-2. Téléverser `dist/chrome.zip`, remplir la fiche (description, capture
-   `store/chrome-screenshot-1280x800.png`, confidentialité : justifier chaque permission et
-   déclarer les données collectées, textes dans `store/chrome-web-store.md`), soumettre.
+2. Téléverser `browser/dist/chrome.zip`, remplir la fiche et soumettre — tout le contenu
+   (description, capture, justification de chaque permission, données collectées) est dans
+   [`browser/store/chrome/`](../browser/store/chrome/).
 3. Relever l'**ID de l'extension** (32 lettres) et l'**ID d'éditeur** (*Compte* dans le tableau
    de bord).
 4. Dans Google Cloud : activer la *Chrome Web Store API*, créer un compte de service et une clé
@@ -75,14 +86,14 @@ paquet** : chacune a un onglet par langue, à remplir à la main (textes dans `s
 ### Firefox (addons.mozilla.org)
 
 1. Créer un compte sur le [Developer Hub](https://addons.mozilla.org/developers/).
-2. Soumettre `dist/firefox.zip` (*Sur ce site*). L'ID `agent@certimens.fr` vient du manifest :
-   il ne peut plus changer une fois publié.
+2. Soumettre `browser/dist/firefox.zip` (*Sur ce site*). L'ID `agent@certimens.fr` vient du
+   manifest : il ne peut plus changer une fois publié.
 3. Générer les clés d'API : *Tools › Manage API Keys* (JWT issuer et JWT secret).
 
 ### Edge Add-ons (facultatif)
 
 1. Créer un compte dans le [Partner Center](https://partner.microsoft.com/dashboard/microsoftedge)
-   (gratuit), soumettre `dist/chrome.zip`.
+   (gratuit), soumettre `browser/dist/chrome.zip`.
 2. Relever le **Product ID**, puis *Publish API* : activer l'API v1.1, relever le **Client ID**
    et créer une **API key**.
 
@@ -90,8 +101,8 @@ paquet** : chacune a un onglet par langue, à remplir à la main (textes dans `s
 
 Sans store dédié, Opera installe aussi les extensions du Chrome Web Store (*Install Chrome
 Extensions*). Pour une fiche sur [addons.opera.com](https://addons.opera.com/developer/) :
-soumettre `dist/chrome.zip` avec l'image promotionnelle `store/opera-300x188.png`, relever l'ID
-du paquet. Opera n'a pas d'API : la CI utilise le cookie `sessionid` du compte développeur, à
+soumettre `browser/dist/chrome.zip` avec l'image promotionnelle de
+[`browser/store/opera/`](../browser/store/opera/), relever l'ID du paquet. Opera n'a pas d'API : la CI utilise le cookie `sessionid` du compte développeur, à
 renouveler quand il expire.
 
 ### Visual Studio Marketplace
@@ -103,18 +114,24 @@ renouveler quand il expire.
 2. Créer un **jeton d'accès personnel** (Azure DevOps › *User settings › Personal access
    tokens*) pour *All accessible organizations*, portée *Marketplace › Manage*, et l'enregistrer
    dans le secret `VSCE_PAT` du dépôt.
-3. Première publication à la main :
-   `npx vsce publish --packagePath dist/certimens-vscode.vsix`. Les suivantes partent de la
-   release.
+3. Première publication à la main : `make -C vscode build && make -C vscode publish` (avec
+   `VSCE_PAT` dans l'environnement). Les suivantes partent de la release.
+
+La fiche, elle, **est le paquet** : le Marketplace lit tout dans `vscode/package.json` et
+affiche `vscode/README.md` — ce qu'il faut y vérifier est dans
+[`vscode/store/marketplace/`](../vscode/store/marketplace/).
 
 **Open VSX** (facultatif, pour VSCodium, Cursor et Gitpod) : dépôt distinct de Microsoft, sans
-publication automatisée ici — déposer le `.vsix` de la release à la main sur
-[open-vsx.org](https://open-vsx.org).
+publication automatisée ici — déposer le `.vsix` de la release à la main
+([`vscode/store/open-vsx/`](../vscode/store/open-vsx/)).
 
 ### Safari (App Store)
 
+La fiche est celle d'une **application**, pas d'une extension :
+[`browser/store/safari/`](../browser/store/safari/).
+
 1. Adhérer à l'[Apple Developer Program](https://developer.apple.com/programs/) (99 $/an).
-2. Sur un Mac : `npm run build && npm run build:safari`, ouvrir le projet Xcode, choisir
+2. Sur un Mac : `make build && make -C browser safari`, ouvrir le projet Xcode, choisir
    l'équipe dans *Signing & Capabilities* des quatre cibles (app et extension, macOS et iOS).
 3. *Product › Archive* pour chaque plateforme, puis *Distribute App › App Store Connect*.
 4. Dans [App Store Connect](https://appstoreconnect.apple.com), remplir la fiche
@@ -128,8 +145,8 @@ publication automatisée ici — déposer le `.vsix` de la release à la main su
 3. Créer un compte dans le [Partner Center](https://partner.microsoft.com/dashboard) (programme
    *Microsoft 365 et Copilot*, gratuit), nouvelle offre *Complément Office*, envoyer
    `certimens-agent-X.Y.Z-word-manifest.xml` de la release.
-4. Remplir la fiche avec `store/appsource.md` et `store/appsource-logo-300x300.png`, et donner
-   un compte de test aux validateurs de Microsoft.
+4. Remplir la fiche avec [`word/store/appsource/`](../word/store/appsource/) — textes, logo et
+   notes pour les testeurs — et donner un compte de test aux validateurs de Microsoft.
 
 Une fois publié, seul un changement du manifest (nom, icônes, autorisations, adresses) repasse
 par la validation ; le code, lui, est pris sur GitHub Pages à chaque ouverture.

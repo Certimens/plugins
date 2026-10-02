@@ -1,6 +1,6 @@
 # Legacy
 
-Anciens outils de captation, remplacés par l'extension (`extension/`) et conservés pour
+Anciens outils de captation, remplacés par l'extension (`browser/`) et conservés pour
 référence. Ils ne fonctionnent plus avec le moteur actuel : ils envoient leurs mesures à
 `POST /telemetry` sur une IP en dur, un endpoint que le moteur n'expose plus.
 

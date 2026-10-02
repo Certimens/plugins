@@ -1,0 +1,18 @@
+Certimens — agents de mesure de la rédaction
+Copyright 2026 Certimens
+
+Ce produit inclut des logiciels développés par Certimens (https://certimens.fr).
+
+Licence : Apache License 2.0 — voir le fichier LICENSE.
+
+Cette licence porte sur le code. Elle ne concède aucun droit sur les marques, les noms
+commerciaux ni les logos de Certimens (clause 6 de la licence) : un dérivé ne peut pas être
+distribué sous le nom « Certimens », ni reprendre l'écu doré de la marque.
+
+---
+
+Composants tiers redistribués dans les paquets :
+
+- Plus Jakarta Sans (browser/fonts/) — Copyright 2020 The Plus Jakarta Sans Project Authors,
+  SIL Open Font License 1.1. Le texte de cette licence accompagne les polices, dans
+  browser/fonts/LICENSE, et les suit dans chaque paquet.

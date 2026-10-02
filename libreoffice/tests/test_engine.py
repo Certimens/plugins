@@ -9,9 +9,9 @@ import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'pythonpath'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src', 'pythonpath'))
 
-from certimens_agent.engine import Engine  # noqa: E402
+from certimens_agent.engine import Engine
 
 
 class FakeEngine(BaseHTTPRequestHandler):
@@ -45,10 +45,12 @@ class FakeEngine(BaseHTTPRequestHandler):
             if body['password'] != 'secret':
                 return self._reply(401, {'error': 'invalid credentials'})
             FakeEngine.next_token += 1
-            return self._reply(200, {'email': body['email'], 'role': 'student', 'token': f'sess{FakeEngine.next_token}'})
+            return self._reply(200, {'email': body['email'], 'role': 'student',
+                                     'token': f'sess{FakeEngine.next_token}'})
         if self.path == '/api/auth/tokens' and self.command == 'POST':
             FakeEngine.next_token += 1
-            return self._reply(201, {'id': f'tid{FakeEngine.next_token}', 'token': f'api{FakeEngine.next_token}', 'label': body['label']})
+            return self._reply(201, {'id': f'tid{FakeEngine.next_token}',
+                                     'token': f'api{FakeEngine.next_token}', 'label': body['label']})
         if self.path == '/api/auth/logout':
             return self._reply(204)
         if self.path.startswith('/api/auth/tokens/') and self.command == 'DELETE':
@@ -105,8 +107,59 @@ class EngineTest(unittest.TestCase):
         self.assertEqual(len(created), 1)
         metrics = [c for c in FakeEngine.calls if c[1].endswith('/metrics')][-1][2]['metrics']
         self.assertEqual(metrics, [{'type': 'total_keystrokes', 'value': 5,
-                                    'period': {'start': '1970-01-01T00:16:40.000Z', 'end': '1970-01-01T00:16:42.000Z'}}])
+                                    'period': {'start': '1970-01-01T00:16:40.000Z',
+                                               'end': '1970-01-01T00:16:42.000Z'}}])
         self.assertTrue(FakeEngine.calls[-1][3].startswith('Bearer '))
+
+    def test_a_window_written_offline_says_so(self):
+        """`offline` ne décrit pas la file, il décrit la fenêtre.
+
+        Une fenêtre écrite alors que le moteur répondait encore part sans rien dire, même si
+        elle attend ensuite des heures — c'est le cas du test précédent. Celle qui est écrite
+        une fois le moteur hors d'atteinte porte `offline: true`, et le moteur en tire un taux
+        de rédaction hors ligne, jamais une pénalité.
+        """
+        self.engine.login(self.url, 'a@b.fr', 'secret')
+        FakeEngine.down = True
+        self.engine.enqueue('doc1', 'Mémoire', (1000, 1002), {'total_keystrokes': 5})
+        self.engine.drain()
+        self.assertEqual(self.engine.status()[0]['state'], 'offline')
+        # Cette seconde fenêtre, elle, est écrite en sachant que le moteur ne répond pas.
+        self.engine.enqueue('doc1', 'Mémoire', (1010, 1012), {'total_keystrokes': 7})
+
+        FakeEngine.down = False
+        FakeEngine.calls = []
+        self.engine.drain()
+        sent = [m for c in FakeEngine.calls if c[1].endswith('/metrics') for m in c[2]['metrics']]
+        self.assertEqual([m.get('offline') for m in sent], [None, True],
+                         'seule la fenêtre écrite hors ligne doit le déclarer')
+
+    def test_the_metric_keys_keep_the_order_the_engine_knows(self):
+        """Le moteur reconnaît le sérialiseur d'un agent à **l'ordre** de ses clés.
+
+        Il n'en connaît que deux : {type, value, period}, et la même avec `offline` ajouté à la
+        fin. Une clé insérée ailleurs — ou envoyée toujours — ferait lever `body_shape_unknown`
+        à chaque envoi honnête, un signal silencieux que l'évaluateur verrait sur nos propres
+        agents. json.loads conserve l'ordre du document : ce test lit donc bien l'ordre du fil.
+        """
+        self.engine.login(self.url, 'a@b.fr', 'secret')
+        self.engine.enqueue('doc1', 'Mémoire', (1000, 1002), {'total_keystrokes': 5})
+        self.engine.drain()
+        FakeEngine.down = True
+        self.engine.enqueue('doc1', 'Mémoire', (1010, 1012), {'total_keystrokes': 7})
+        self.engine.drain()
+        FakeEngine.down = False
+        self.engine.enqueue('doc1', 'Mémoire', (1020, 1022), {'total_keystrokes': 9})
+        self.engine.drain()
+
+        sent = [m for c in FakeEngine.calls if c[1].endswith('/metrics') for m in c[2]['metrics']]
+        orders = {tuple(m.keys()) for m in sent}
+        self.assertTrue(orders, 'aucune mesure envoyée')
+        self.assertTrue(orders <= {('type', 'value', 'period'),
+                                   ('type', 'value', 'period', 'offline')}, orders)
+        self.assertIn(('type', 'value', 'period', 'offline'), orders)
+        for metric in sent:
+            self.assertEqual(tuple(metric['period'].keys()), ('start', 'end'))
 
     def test_pause_survives_a_restart_and_does_not_hold_the_queue(self):
         """Suspending stops the measurement, not the sending.
@@ -151,7 +204,8 @@ class EngineTest(unittest.TestCase):
     def test_other_400_keeps_the_extended_metrics(self):
         """An invalid period used to silence focus_losses and the like for good."""
         self.engine.login(self.url, 'a@b.fr', 'secret')
-        FakeEngine.metrics_error = {'code': 'metric_period_invalid', 'error': 'metric period end must be after its start'}
+        FakeEngine.metrics_error = {'code': 'metric_period_invalid',
+                                    'error': 'metric period end must be after its start'}
         self.engine.enqueue('doc1', 'Mémoire', (1000, 1002), {'total_keystrokes': 5, 'focus_losses': 1})
         self.engine.drain()
         self.assertFalse(self.engine.state['extendedUnsupported'])

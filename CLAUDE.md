@@ -12,13 +12,11 @@ face.
 
 | Dossier | Ce que c'est |
 | --- | --- |
-| `extension/` | extension navigateur MV3 (Google Docs, Word Online) — Chrome, Firefox, Safari, Edge, Opera |
+| `browser/` | extension navigateur MV3 (Google Docs, Word Online) — Chrome, Firefox, Safari, Edge, Opera |
 | `word/` | complément Office pour Word (Office.js, servi par GitHub Pages) |
 | `libreoffice/` | extension Writer en Python/UNO, paquet `.oxt` |
 | `vscode/` | extension Visual Studio Code, paquet `.vsix` — un document moteur par fichier du projet |
-| `scripts/` | build des paquets, certificat de dev Word, visuels de marque |
-| `tests/` | les capteurs JavaScript, sans navigateur ni hôte (`npm test`) |
-| `store/` | visuels et textes des fiches des boutiques |
+| `scripts/` | la marque et le script qui régénère icônes et visuels — tout ce qui n'est à aucun agent |
 | `legacy/` | anciens agents de bureau, conservés pour référence — ne pas faire évoluer |
 
 La documentation de référence vit dans **`docs/`** ([docs/README.md](docs/README.md) en est le
@@ -38,7 +36,7 @@ son API, rien de plus.
 - `mesures-redaction` — **sur toute modification d'un capteur, d'une constante de mesure ou
   d'une metric**, quel que soit le dossier : la définition est unique, les implémentations sont
   quatre.
-- `extension-navigateur` — travail dans `extension/`, `scripts/build.mjs` ou `eslint.config.js`.
+- `extension-navigateur` — travail dans `browser/` : code, `build.mjs` ou configuration de lint.
 - `complement-word` — travail dans `word/` ou sur le manifest Office.
 - `extension-libreoffice` — travail dans `libreoffice/`.
 - `extension-vscode` — travail dans `vscode/`.
@@ -54,14 +52,39 @@ son API, rien de plus.
   standard seule côté Python.
 - La version vient de git (tag, ou dernier tag + commit) : **ne jamais l'incrémenter à la main**
   dans un manifest.
+- Le dépôt est sous **Apache-2.0** (`LICENSE`, `NOTICE`). Chaque agent y est lié et chaque
+  paquet l'emporte ; un `package.json` nouveau déclare `"license": "Apache-2.0"`. La licence ne
+  concède **aucun droit sur la marque** : ne jamais l'écrire autrement.
 - Aucun texte rédigé par l'étudiant ne quitte son poste : les agents n'envoient que des
   compteurs.
+- **Chaque agent est un projet autonome**, et tous ont la même forme : `src/` (ce qui est
+  livré, et rien d'autre), `tests/`, `store/` (une fiche par boutique), `dist/` (ignoré), son
+  `Makefile`, et son outillage — `package.json` ou `requirements-dev.txt`, avec son verrou.
+  **Un paquet, c'est `src/` plus `LICENSE` et `NOTICE`** : un fichier posé à la racine d'un
+  agent n'est, par construction, jamais livré.
+- **Chaque agent est écrit dans sa langue de bout en bout** : les trois agents JavaScript ont
+  un `build.mjs`, celui en Python a un `build.py` et pas une ligne de Node.
+- Un outil s'ajoute **dans le projet qui l'utilise**, jamais à la racine ; le `Makefile` de la
+  racine ne fait que les parcourir, et c'est tout ce que lance la CI. Ne rien faire pointer
+  d'un agent vers `../`, et laisser chaque agent ignorer ce qu'il produit dans son
+  `.gitignore`.
+- Ce que les quatre partagent — `ui.css`, `ui.js`, `i18n.js`, les polices, les icônes et le bac
+  à sable des tests — vit dans `browser/src/` et **arrive chez les autres par des liens
+  symboliques**, versionnés comme tels : ne jamais en recopier le contenu.
+- Dans les trois agents JavaScript, **les commandes sont déclarées dans `package.json`** et le
+  `Makefile` ne fait que les appeler : une commande nouvelle s'ajoute comme script npm, pas
+  comme recette make.
+- Les linters couvrent cinq langages (JS, CSS, HTML, Python, shell) et leurs configurations
+  sont commentées : **désactiver une règle, c'est écrire pourquoi**
+  ([docs/developpement.md](docs/developpement.md)). La racine n'a ni outillage ni
+  `package.json`.
 
 ```bash
-npm run lint              # ESLint (extension/, word/, vscode/, scripts/, tests/)
-npm test                  # toute la suite, sans navigateur, sans Word, sans LibreOffice, sans VS Code
-npm run build             # tous les paquets dans dist/
-npm run lint:firefox      # validation AMO (après build)
-npm run lint:word         # validation Microsoft du manifest (après build, réseau requis)
-npm run test:libreoffice  # tests Python, sans LibreOffice
+make install                # installe l'outillage de chaque projet (à faire une fois)
+make                        # lint puis tests, agent par agent
+make build                  # chaque agent construit son paquet dans <agent>/dist/
+make -C browser lint        # un seul agent : lint, test, build, publish…
+make -C browser lint-amo    # validation AMO (après build)
+make -C word lint-manifest  # validation Microsoft du manifest (après build, réseau requis)
+make -C libreoffice test    # tests Python, sans LibreOffice
 ```

@@ -39,14 +39,15 @@ jobs:
         with:
           node-version: "22"
           cache: npm
+          cache-dependency-path: word/package-lock.json
       - name: Install
-        run: npm ci
+        run: make -C word install
       - name: Build
-        run: npm run build
+        run: make -C word build
       - name: Validate Word add-in manifest
-        run: npm run lint:word
+        run: make -C word lint-manifest
       - name: Site layout
-        run: mkdir site && cp -r dist/word site/word
+        run: mkdir site && cp -r word/dist/word site/word
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site
@@ -54,6 +55,6 @@ jobs:
         uses: actions/deploy-pages@v5
       - name: Summary
         run: |
-          echo "### Complément Word publié ($(cat dist/VERSION))" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Complément Word publié ($(cat word/dist/VERSION))" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "${{ steps.deploy.outputs.page_url }}word/ — rouvrez le volet dans Word pour le charger." >> "$GITHUB_STEP_SUMMARY"

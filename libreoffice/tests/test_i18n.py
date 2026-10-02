@@ -1,8 +1,8 @@
 """Dictionnaire d'interface de l'agent LibreOffice (i18n.py).
 
-Les mêmes vérifications que tests/i18n.test.mjs côté JavaScript : ce qui casse une traduction,
-c'est une clé oubliée dans une langue, une variable qui change de nom d'une langue à l'autre, ou
-une règle de choix de la langue qui dérive de celle du moteur.
+Les mêmes vérifications que browser/tests/i18n.test.mjs côté JavaScript : ce qui casse une
+traduction, c'est une clé oubliée dans une langue, une variable qui change de nom d'une langue
+à l'autre, ou une règle de choix de la langue qui dérive de celle du moteur.
 """
 
 import json
@@ -12,9 +12,9 @@ import subprocess
 import sys
 import unittest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'pythonpath'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src', 'pythonpath'))
 
-from certimens_agent import i18n  # noqa: E402
+from certimens_agent import i18n
 
 
 class DictionaryTest(unittest.TestCase):
@@ -62,12 +62,12 @@ class DictionaryTest(unittest.TestCase):
         C'est le seul contrôle qui traverse les deux langages, et il en vaut la peine : un
         étudiant qui passe de l'extension à LibreOffice doit lire la même phrase, et une clé
         réutilisée pour autre chose ne se voit pas autrement. Le dictionnaire JavaScript est lu
-        tel qu'il est livré (extension/i18n.js), sans rien y ajouter.
+        tel qu'il est livré (browser/i18n.js), sans rien y ajouter.
         """
         script = ("const vm=require('vm'),fs=require('fs');const c=vm.createContext({});"
                   "vm.runInContext(fs.readFileSync(process.argv[1],'utf8')+';globalThis.M=MESSAGES;',c);"
                   "console.log(JSON.stringify(c.M));")
-        source = os.path.join(os.path.dirname(__file__), '..', '..', 'extension', 'i18n.js')
+        source = os.path.join(os.path.dirname(__file__), '..', '..', 'browser', 'src', 'i18n.js')
         try:
             output = subprocess.check_output(['node', '-e', script, source])
         except (OSError, subprocess.CalledProcessError):

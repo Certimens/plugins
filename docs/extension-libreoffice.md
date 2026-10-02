@@ -1,6 +1,6 @@
 # Extension LibreOffice
 
-Une extension **Writer** en Python (UNO) dans `libreoffice/`, paquet `dist/libreoffice.oxt`
+Une extension **Writer** en Python (UNO) dans `libreoffice/`, paquet `libreoffice/dist/libreoffice.oxt`
 (LibreOffice 7.0+ ; sous Linux, le paquet `libreoffice-script-provider-python` de la
 distribution est nécessaire).
 
@@ -31,7 +31,7 @@ coordonnées, donc une sélection tracée à la souris n'y est pas détectable
   - `log.py` : `warn()`, ce que l'agent dit quand il rattrape une erreur. LibreOffice ne donne
     pas de console à une extension : le message part par `logging`, vers le terminal d'où
     LibreOffice a été lancé, et jamais avec ce que l'étudiant a écrit.
-- `tests/` : `npm run test:libreoffice`, sans LibreOffice.
+- `tests/` : `make -C libreoffice test`, sans LibreOffice.
 
 Chaque document garde son identifiant dans ses **propriétés personnalisées** (il suit le
 fichier, `.odt` comme `.docx`) ; le nom du fichier est répercuté sur le moteur après

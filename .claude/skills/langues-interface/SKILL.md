@@ -30,10 +30,10 @@ espace Certimens et ses e-mails sont déjà dans cette langue.
 
 | Agent | Interface | Fiche / manifest |
 | --- | --- | --- |
-| Extension navigateur | `extension/i18n.js` | `extension/_locales/{fr,en}/messages.json`, `__MSG_…__` dans le manifest |
-| Complément Word | `extension/i18n.js` (partagé, copié par le build) | `<Override Locale="en-us">` dans `word/manifest.xml` |
-| Extension LibreOffice | `libreoffice/pythonpath/certimens_agent/i18n.py` | `description.xml` (`lang=`) et `description/description-{fr,en}.txt` |
-| Extension VS Code | `vscode/i18n.js` | `vscode/package.nls.json` (fr, le repli) et `package.nls.en.json` |
+| Extension navigateur | `browser/src/i18n.js` | `browser/src/_locales/{fr,en}/messages.json`, `__MSG_…__` dans le manifest |
+| Complément Word | `browser/src/i18n.js` (partagé, copié par le build) | `<Override Locale="en-us">` dans `word/src/manifest.xml` |
+| Extension LibreOffice | `libreoffice/src/pythonpath/certimens_agent/i18n.py` | `description.xml` (`lang=`) et `description/description-{fr,en}.txt` |
+| Extension VS Code | `vscode/src/i18n.js` | `vscode/package.nls.json` (fr, le repli) et `package.nls.en.json` |
 
 Le manifest d'un agent est lu **avant** notre code : c'est l'hôte qui le traduit, d'après sa
 propre langue d'interface. Le nom dans la barre d'outils peut donc être anglais pendant que le
@@ -42,8 +42,9 @@ d'autre n'est possible pour un texte que l'hôte lit avant nous.
 
 ## Ce qui casse une traduction
 
-- **Une clé oubliée dans une langue.** Les suites la cherchent : `tests/i18n.test.mjs` pour les
-  dictionnaires JavaScript, `libreoffice/tests/test_i18n.py` pour le Python.
+- **Une clé oubliée dans une langue.** Chaque agent cherche la sienne :
+  `browser/tests/i18n.test.mjs`, `vscode/tests/i18n.test.mjs`,
+  `libreoffice/tests/test_i18n.py`.
 - **Une variable renommée d'un côté seulement** (`{title}`, `{count}`) : testé aussi.
 - **Une clé réutilisée pour autre chose.** Les clés communes à deux agents doivent porter le
   **même message** — c'est vérifié entre l'extension et VS Code, et entre l'extension et

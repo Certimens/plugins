@@ -1,5 +1,9 @@
-// Regenerates the icons and the store images from the brand mark (store/brand-mark.png, the gold
-// shield of certimens.fr, same file as the engine's ui/public/logo.png).
+// Regenerates the icons and the store images of every agent from the brand mark
+// (brand-mark.png, next to this script: the gold shield of the Certimens web space).
+//
+// It is the one thing left at the root that touches several agents at once, which is why it
+// lives here and not in one of them: it writes browser/src/icons/, word/src/icons/, and the store
+// images each agent keeps under its own store/<boutique>/.
 //
 // Everything here follows the brand guidelines the engine documents (docs/charte-graphique.md):
 // slate #1E293B as the dominant color, brass gold #C5A059 as the single accent, Plus Jakarta Sans
@@ -16,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const mark = join(root, 'store', 'brand-mark.png');
+const mark = join(dirname(fileURLToPath(import.meta.url)), 'brand-mark.png');
 
 const SLATE = '#1e293b', SLATE_DARK = '#0f172a', GOLD = '#c5a059', GOLD_TEXT = '#705e3a';
 const BG = '#f8fafc', PAPER = '#ffffff', TEXT = '#1a202c', MUTED = '#54595f', LINE = '#e5e5e5';
@@ -34,8 +38,8 @@ const wordmark = (x, y, size, fill) =>
 // --- 1. ICONS ---
 // The bare shield, as the site's favicon is: gold reads on a light toolbar as on a dark one.
 async function icons() {
-    for (const size of [16, 32, 48, 128]) await shield(size).toFile(join(root, 'extension', 'icons', `icon${size}.png`));
-    for (const size of [64, 80]) await shield(size).toFile(join(root, 'word', 'icons', `icon${size}.png`));
+    for (const size of [16, 32, 48, 128]) await shield(size).toFile(join(root, 'browser', 'src', 'icons', `icon${size}.png`));
+    for (const size of [64, 80]) await shield(size).toFile(join(root, 'word', 'src', 'icons', `icon${size}.png`));
 }
 
 // --- 2. STORE TILES ---
@@ -45,7 +49,7 @@ async function tiles() {
     await sharp({ create: { width: 300, height: 300, channels: 4, background: SLATE } })
         .composite([{ input: await shield(168).toBuffer(), gravity: 'centre' }])
         .png()
-        .toFile(join(root, 'store', 'appsource-logo-300x300.png'));
+        .toFile(join(root, 'word', 'store', 'appsource', 'logo-300x300.png'));
 
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="188">
   <rect width="300" height="188" fill="${SLATE}"/>
@@ -55,12 +59,12 @@ async function tiles() {
     await sharp(Buffer.from(svg))
         .composite([{ input: await shield(72).toBuffer(), left: 28, top: 58 }])
         .png()
-        .toFile(join(root, 'store', 'opera-300x188.png'));
+        .toFile(join(root, 'browser', 'store', 'opera', 'promo-300x188.png'));
 }
 
 // --- 3. CHROME WEB STORE SCREENSHOT ---
 // A mock-up rather than a capture: the popup over Google Docs, drawn with the styles of
-// extension/ui.css so the listing shows what the extension actually looks like.
+// browser/ui.css so the listing shows what the extension actually looks like.
 async function screenshot() {
     const bullets = [
         ['Fonctionne directement dans', 'Google Docs et Word Online'],
@@ -114,7 +118,7 @@ async function screenshot() {
     }
     scene += `<rect x="573" y="${y - 47}" width="1.5" height="15" fill="${TEXT}"/>`; // the caret
 
-    // the popup, in the styles of extension/ui.css
+    // the popup, in the styles of browser/ui.css
     const P = 880, W = 340;
     scene += `<rect x="${P}" y="100" width="${W}" height="516" rx="14" fill="${PAPER}" stroke="${LINE}"/>`;
     scene += wordmark(P + 48, 141, 19, TEXT);
@@ -151,10 +155,10 @@ async function screenshot() {
             { input: await shield(20).toBuffer(), left: 1194, top: 62 },
         ])
         .png()
-        .toFile(join(root, 'store', 'chrome-screenshot-1280x800.png'));
+        .toFile(join(root, 'browser', 'store', 'chrome', 'screenshot-1280x800.png'));
 }
 
 await icons();
 await tiles();
 await screenshot();
-console.log('Icônes et visuels de boutique régénérés depuis store/brand-mark.png.');
+console.log('Icônes et visuels de boutique régénérés depuis scripts/brand-mark.png.');

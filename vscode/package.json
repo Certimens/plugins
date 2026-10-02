@@ -4,7 +4,7 @@
     "description": "%extension.description%",
     "version": "0.0.0",
     "publisher": "certimens",
-    "license": "SEE LICENSE IN ../README.md",
+    "license": "Apache-2.0",
     "repository": {
         "type": "git",
         "url": "https://github.com/Certimens/plugins.git",
@@ -23,8 +23,8 @@
         "rédaction",
         "intégrité"
     ],
-    "icon": "media/icon128.png",
-    "main": "./extension.js",
+    "icon": "src/media/icon128.png",
+    "main": "./src/extension.js",
     "activationEvents": [
         "onStartupFinished"
     ],
@@ -48,7 +48,7 @@
                 {
                     "id": "certimens",
                     "title": "%view.title%",
-                    "icon": "media/shield.svg"
+                    "icon": "src/media/shield.svg"
                 }
             ]
         },
@@ -113,5 +113,19 @@
                 }
             }
         }
+    },
+    "scripts": {
+        "lint": "eslint .",
+        "test": "node --test \"tests/*.test.mjs\"",
+        "build": "node build.mjs",
+        "dev": "code --extensionDevelopmentPath=.",
+        "publish": "vsce publish --packagePath dist/certimens-vscode.vsix",
+        "clean": "rm -rf dist"
+    },
+    "devDependencies": {
+        "@eslint/js": "10.0.1",
+        "@vscode/vsce": "3.6.2",
+        "eslint": "10.11.0",
+        "globals": "17.12.0"
     }
 }

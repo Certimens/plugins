@@ -23,7 +23,7 @@ de l'extension : connexion, document Certimens du document, rendu sur un devoir,
   `taskpane.html`), mais GitHub Pages ne sert aucun listing de dossier : sans elle, l'adresse du
   site répond 404 alors que tous les fichiers sont bien là. Le build y injecte la version.
 
-Le build reprend de `extension/` la feuille de style `ui.css`, le code partagé des deux volets
+Le build reprend de `browser/` la feuille de style `ui.css`, le code partagé des deux volets
 `ui.js`, le dictionnaire `i18n.js` ([langues.md](langues.md)), les polices et les icônes : le
 volet Word et la popup sont le même écran, ils n'ont pas deux jeux de textes.
 
@@ -39,14 +39,14 @@ autorise cette origine en CORS sur `/api` — voir [moteur.md](moteur.md).
 ## Tester en local
 
 ```bash
-npm run build && npm run word:serve   # HTTPS sur localhost:3000, certificat de dev au 1er lancement
+make -C word build && make -C word serve   # HTTPS sur localhost:3000, certificat de dev au 1er lancement
 ```
 
-Puis charger `dist/word-localhost.xml` :
+Puis charger `word/dist/word-localhost.xml` :
 
 - Word sur le web : *Accueil › Compléments › Plus de compléments › Mes compléments › Charger mon
   complément* ;
-- Windows / Mac : `npx office-addin-debugging start dist/word-localhost.xml desktop`.
+- Windows / Mac : `npx office-addin-debugging start word/dist/word-localhost.xml desktop`.
 
 Le bouton **Certimens** apparaît dans l'onglet *Accueil*. Pour un moteur local, saisir
 `http://localhost:8080` comme adresse du moteur.
@@ -60,7 +60,7 @@ Le complément est une page web : il suffit de republier GitHub Pages. Le workfl
 gh workflow run pages.yml --ref ma-branche   # ou Actions › Word add-in (GitHub Pages) › Run workflow
 ```
 
-Il construit la branche, valide le manifest et déploie `dist/word/` sur
+Il construit la branche, valide le manifest et déploie `word/dist/word/` sur
 `https://certimens.github.io/plugins/word/` — les mêmes adresses que la release, donc **rien à
 recharger côté Word** : fermer et rouvrir le volet suffit. Deux réserves :
 
@@ -71,7 +71,7 @@ recharger côté Word** : fermer et rouvrir le volet suffit. Deux réserves :
   défaut, à élargir (ou publier depuis `main`) ;
 - c'est le site de **production** qui est remplacé : les étudiants déjà équipés reçoivent ce
   build. La prochaine release le réécrasera avec celui du tag. Pour un essai qui n'engage
-  personne, `npm run word:serve` et `dist/word-localhost.xml` restent la bonne piste.
+  personne, `make -C word serve` et `word/dist/word-localhost.xml` restent la bonne piste.
 
 ## Vérifier ce qui est en ligne
 
@@ -81,7 +81,7 @@ L'adresse du site sert `index.html`, et chaque fichier se teste directement, san
 for f in manifest.xml taskpane.html taskpane.js agent.js sensor.js ui.css ui.js i18n.js; do
   curl -s -o /dev/null -w "%{http_code} $f\n" "https://certimens.github.io/plugins/word/$f"
 done
-curl -s https://certimens.github.io/plugins/word/manifest.xml | grep -E '<Version>|SourceLocation'
+curl -s https://certimens.github.io/plugins/word/src/manifest.xml | grep -E '<Version>|SourceLocation'
 ```
 
 Huit `200` et la version attendue dans le manifest : le site est bon. Un `404` **sur tous** les

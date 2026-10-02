@@ -1,6 +1,6 @@
 name: Release
 
-# Un tag vX.Y.Z (égal à la version de extension/manifest.json) :
+# Un tag vX.Y.Z (égal à la version de browser/manifest.json) :
 # 1. relance la CI, qui construit une seule fois les paquets de tous les navigateurs ;
 # 2. crée la release GitHub avec ces paquets, nommés d'après la version, et publie le
 #    complément Word sur GitHub Pages (les manifests chargés dans Word pointent vers ce site) ;
@@ -108,19 +108,21 @@ jobs:
         with:
           node-version: "22"
           cache: npm
+          cache-dependency-path: vscode/package-lock.json
+      # vsce est déclaré par l'agent VS Code, pas par le dépôt.
       - name: Install
-        run: npm ci
+        run: make -C vscode install
       - uses: actions/download-artifact@v8
         with:
           name: certimens-vscode
-          path: dist
+          path: vscode/dist
       - name: Publish
         run: |
           if [ -z "$VSCE_PAT" ]; then
             echo "::notice::VS Code Marketplace non configuré (VSCE_PAT vide) : ignoré."
             exit 0
           fi
-          npx vsce publish --packagePath dist/certimens-vscode.vsix
+          make -C vscode publish
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
@@ -132,35 +134,37 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { store: chrome, zip: chrome.zip, id: CHROME_EXTENSION_ID }
+          - { store: chrome, id: CHROME_EXTENSION_ID }
           # Gated on the JWT issuer, not FIREFOX_EXTENSION_ID: that one is hardcoded below, so
           # it would never be empty and the job could never skip when AMO isn't configured.
-          - { store: firefox, zip: firefox.zip, id: FIREFOX_JWT_ISSUER }
-          - { store: edge, zip: chrome.zip, id: EDGE_PRODUCT_ID }
-          - { store: opera, zip: chrome.zip, id: OPERA_PACKAGE_ID }
+          - { store: firefox, id: FIREFOX_JWT_ISSUER }
+          - { store: edge, id: EDGE_PRODUCT_ID }
+          - { store: opera, id: OPERA_PACKAGE_ID }
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
+          cache-dependency-path: browser/package-lock.json
+      # publish-browser-extension est déclaré par l'agent navigateur, qui sait aussi quel
+      # paquet va dans quelle boutique : la cible publish-<store> de son Makefile.
       - name: Install
-        run: npm ci
+        run: make -C browser install
       - uses: actions/download-artifact@v8
         with:
           name: extension
-          path: dist
+          path: browser/dist
       - name: Publish
         run: |
           if [ -z "${!STORE_ID}" ]; then
             echo "::notice::$STORE non configuré ($STORE_ID vide) : ignoré."
             exit 0
           fi
-          npx publish-extension "--$STORE-zip" "dist/$ZIP"
+          make -C browser "publish-$STORE"
         env:
           STORE: ${{ matrix.store }}
           STORE_ID: ${{ matrix.id }}
-          ZIP: ${{ matrix.zip }}
           # Chrome Web Store API v2, compte de service Google Cloud.
           CHROME_API_VERSION: v2
           CHROME_EXTENSION_ID: ${{ vars.CHROME_EXTENSION_ID }}

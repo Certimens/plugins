@@ -1,0 +1,32 @@
+{
+  "name": "@certimens/browser",
+  "private": true,
+  "description": "Agent Certimens — extension navigateur MV3 (Chrome, Firefox, Safari, Edge, Opera)",
+  "license": "Apache-2.0",
+  "scripts": {
+    "lint": "npm run lint:js && npm run lint:css && npm run lint:html && npm run lint:sh",
+    "lint:js": "eslint .",
+    "lint:css": "stylelint src/ui.css",
+    "lint:html": "html-validate src/*.html",
+    "lint:sh": "if command -v shellcheck >/dev/null; then shellcheck safari.sh; else echo \"shellcheck absent : lint de safari.sh ignoré (les runners GitHub l'ont).\"; fi",
+    "lint:amo": "web-ext lint --source-dir dist/firefox --self-hosted=false --warnings-as-errors",
+    "test": "node --test \"tests/*.test.mjs\"",
+    "build": "node build.mjs",
+    "safari": "./safari.sh",
+    "publish:chrome": "publish-extension --chrome-zip dist/chrome.zip",
+    "publish:firefox": "publish-extension --firefox-zip dist/firefox.zip",
+    "publish:edge": "publish-extension --edge-zip dist/chrome.zip",
+    "publish:opera": "publish-extension --opera-zip dist/chrome.zip",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.11.0",
+    "globals": "17.12.0",
+    "html-validate": "11.16.1",
+    "publish-browser-extension": "6.1.1",
+    "stylelint": "17.16.0",
+    "stylelint-config-standard": "40.0.0",
+    "web-ext": "10.7.0"
+  }
+}
