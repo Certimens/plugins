@@ -1,0 +1,29 @@
+// Type checking for what the extension ships — `npm run lint:types`, no build step and no
+// transpilation: the file that is checked is the file that is packaged.
+//
+// CommonJS, unlike the two other JavaScript agents: an extension is loaded by the editor with
+// `require`, not by a page with <script>, so each file here is a module with its own scope and
+// one configuration covers them all.
+//
+// `strict` stays off, deliberately, and for the same reason as in the three other agents: it
+// would ask for a JSDoc type on every parameter of every function, for what it catches here —
+// nothing we have ever got wrong. What is caught without it is what we do get wrong: a property
+// that does not exist on a `vscode.*` object, a call with the wrong number of arguments, a
+// value used as a number that is not one.
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "noEmit": true,
+    "target": "es2022",
+    "module": "commonjs",
+    "lib": ["es2022"],
+    "strict": false,
+    // Do not follow `require` into node_modules: the tooling's own JavaScript is not ours to
+    // check, and vsce drags in a good deal of it.
+    "maxNodeModuleJsDepth": 0,
+    "skipLibCheck": true,
+    // The editor's API, and Node's: this agent runs on the editor's Node, not in a page.
+    "types": ["vscode", "node"]
+  },
+  "include": ["src/**/*.js"]
+}

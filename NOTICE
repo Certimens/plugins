@@ -1,0 +1,32 @@
+Certimens — agents de mesure de la rédaction
+Copyright 2026 Certimens
+
+Ce produit inclut des logiciels développés par Certimens (https://certimens.fr).
+
+Licence : GNU Affero General Public License, version 3 — voir le fichier LICENSE.
+
+Ce programme est un logiciel libre : vous pouvez le redistribuer et le modifier selon les
+termes de l'AGPL version 3 telle que publiée par la Free Software Foundation. Il est
+distribué dans l'espoir qu'il sera utile, mais SANS AUCUNE GARANTIE, sans même la garantie
+implicite de QUALITÉ MARCHANDE ou d'ADÉQUATION À UN USAGE PARTICULIER.
+
+Toute version modifiée de ces agents, distribuée ou mise à disposition d'utilisateurs à
+travers un réseau, doit être publiée sous cette même licence, code source complet compris
+(clauses 5 et 13 de la licence).
+
+---
+
+Terme additionnel au titre de la clause 7(e) de la licence :
+
+Cette licence porte sur le code. Elle ne concède aucun droit sur les marques, les noms
+commerciaux ni les logos de Certimens : un dérivé ne peut pas être distribué sous le nom
+« Certimens », ni reprendre l'écu doré de la marque. Un dérivé se distribue sous un autre
+nom et sous sa propre identité visuelle.
+
+---
+
+Composants tiers redistribués dans les paquets :
+
+- Plus Jakarta Sans (browser/fonts/) — Copyright 2020 The Plus Jakarta Sans Project Authors,
+  SIL Open Font License 1.1. Le texte de cette licence accompagne les polices, dans
+  browser/fonts/LICENSE, et les suit dans chaque paquet.

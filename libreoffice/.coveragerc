@@ -1,0 +1,20 @@
+# Coverage of the LibreOffice agent's tests. Reporting, not a gate on every commit:
+# `make coverage` runs it, `make test` does not.
+#
+# agent.py, dialogs.py and sensor.py are omitted on purpose. They are the UNO glue — windows,
+# listeners, the component's lifecycle — and they only run inside LibreOffice, which the test
+# suite deliberately does not require (see docs/developpement.md). Measuring them would report
+# 0% forever and drown the number that matters: the counting rules and the engine client, which
+# are plain Python and are covered.
+[run]
+source = src/pythonpath
+omit =
+    src/pythonpath/certimens_agent/agent.py
+    src/pythonpath/certimens_agent/dialogs.py
+    src/pythonpath/certimens_agent/sensor.py
+
+[report]
+show_missing = true
+skip_covered = true
+# Below this, something testable stopped being tested.
+fail_under = 80
