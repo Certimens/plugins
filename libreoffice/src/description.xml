@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Template: build.py replaces {{VERSION}}, which comes from git (a tag, or the last tag
+     plus the commit) and never from a manifest.
+     The identifier must not change once the extension has been published. -->
+<description xmlns="http://openoffice.org/extensions/description/2006"
+             xmlns:xlink="http://www.w3.org/1999/xlink"
+             xmlns:d="http://openoffice.org/extensions/description/2006"
+             xmlns:l="http://libreoffice.org/extensions/description/2011">
+  <identifier value="fr.certimens.agent"/>
+  <version value="{{VERSION}}"/>
+  <dependencies>
+    <!-- info bars (XInfobarProvider) and bundled Python 3 -->
+    <l:LibreOffice-minimal-version value="7.0" d:name="LibreOffice 7.0"/>
+  </dependencies>
+  <!-- Where LibreOffice asks whether a newer version exists. Of the four agents, this is the
+       only one no host updates on its own: a browser updates its extensions, so does the
+       Marketplace, and the Word task pane is served fresh from its site. An .oxt, once
+       installed, knows nothing — unless it says here where to look.
+
+       The address is frozen in every installed copy, like the identifier: what is published
+       there must stay published there. The file is written by build.py, in its feed mode, and
+       deployed to GitHub Pages; what it holds is the last libreoffice-v* tag and the .oxt of
+       that release.
+
+       Never write a double hyphen in a comment of this file: XML forbids it, and LibreOffice
+       refuses the whole package over it. `unopkg add` then answers that a comment must not
+       contain one, and nothing else in the repository says so first: the package builds, the
+       tests pass, and only a real office suite refuses it. -->
+  <update-information>
+    <src xlink:href="https://certimens.github.io/plugins/libreoffice/update.xml"/>
+  </update-information>
+  <publisher>
+    <name xlink:href="https://certimens.fr" lang="fr">Certimens</name>
+    <name xlink:href="https://certimens.fr" lang="en">Certimens</name>
+  </publisher>
+  <!-- LibreOffice shows the entry matching its own interface language and falls back to the
+       first one otherwise. The windows follow the Certimens account instead (see i18n.py). -->
+  <display-name>
+    <name lang="fr">Certimens — Agent de rédaction</name>
+    <name lang="en">Certimens — Writing Agent</name>
+  </display-name>
+  <icon>
+    <default xlink:href="icons/icon128.png"/>
+  </icon>
+  <extension-description>
+    <src xlink:href="description/description-fr.txt" lang="fr"/>
+    <src xlink:href="description/description-en.txt" lang="en"/>
+  </extension-description>
+</description>

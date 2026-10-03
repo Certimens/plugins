@@ -1,0 +1,6 @@
+# What this project produces or installs. No node_modules here: this agent is in Python.
+dist/
+.venv/
+.ruff_cache/
+__pycache__/
+.coverage
