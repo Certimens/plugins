@@ -1,0 +1,16 @@
+{
+    "extension.displayName": "Certimens — Writing Agent",
+    "extension.description": "Measures how you write your code, file by file, and reports it to your Certimens space. No text leaves your machine without your say-so.",
+    "view.title": "Certimens",
+    "view.name": "Writing agent",
+    "command.login": "Certimens: log in",
+    "command.logout": "Certimens: log out",
+    "command.submit": "Certimens: submit this file",
+    "command.togglePause": "Certimens: pause or resume measurement",
+    "command.flush": "Certimens: send the waiting measurements",
+    "command.focusPanel": "Certimens: open the panel",
+    "configuration.title": "Certimens",
+    "configuration.exclude": "Paths that are not measured: dependencies, build output, generated files. An excluded file never creates a document on the engine.",
+    "capability.untrustedWorkspaces": "The agent watches typing and runs nothing from the project.",
+    "capability.virtualWorkspaces": "Measurement covers the files of a project opened from disk."
+}

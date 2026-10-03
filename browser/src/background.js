@@ -1,0 +1,560 @@
+// Certimens — writing agent, background: pushes measurement windows to the engine.
+//
+// Each document (Google Docs or Word Online) is tied to an engine document (created on the first send via
+// POST /api/documents, then remembered). Measurements are sent to POST /api/documents/:id/metrics,
+// authenticating with an API token (Bearer) created at login and kept in place of the
+// password. When offline, they stay in a persisted queue (chrome.storage.local) and are
+// resent every minute.
+
+// The shared dictionary. Chrome runs this as a service worker and imports it here; Firefox runs
+// it as an event page and loads it from the manifest's background.scripts, where importScripts
+// does not exist.
+if (typeof importScripts === 'function') importScripts('i18n.js');
+
+const DEFAULT_ENGINE_URL = 'https://monespace.certimens.fr';
+const RETRY_ALARM = 'certimens-retry';
+const MAX_QUEUE = 5000;
+// Google Docs export hosts: docs.google.com redirects to googleusercontent.com.
+const GOOGLE_EXPORT_ORIGINS = ['https://docs.google.com/document/*', 'https://*.googleusercontent.com/*'];
+// The engine caps a request body at 25 MiB; in base64, the .docx grows by a third.
+const MAX_UPLOAD_BASE64 = 24 * 1024 * 1024;
+
+// Metrics added by this agent: an older engine rejects them (400 "unknown metric
+// type"), so we drop them rather than lose the whole window.
+const EXTENDED_TYPES = new Set(['paste_events', 'focus_losses', 'median_flight_ms']);
+
+class HttpError extends Error {
+    constructor(status, message, code) {
+        super(message);
+        this.status = status;
+        // The engine names the rule that refused the request ({"code", "error"}): a 400 says
+        // which one, instead of being read as "this engine is too old".
+        this.code = code || '';
+    }
+}
+
+// --- 1. STORAGE ---
+async function getConfig() {
+    const { config } = await chrome.storage.local.get('config');
+    // token: API token (Bearer) kept in place of the password — the password itself is never
+    // stored. tokenId: its id, used to revoke the token at logout.
+    // language: the account's own, sent by the engine at login, so the popup and the options page
+    // open in the language the student chose in their Certimens space.
+    return { engineUrl: DEFAULT_ENGINE_URL, email: '', displayName: '', token: '', tokenId: '', language: '', ...config };
+}
+
+function hasAuth(config) {
+    return !!config.token;
+}
+
+async function getState() {
+    const s = await chrome.storage.local.get(['engineIds', 'titles', 'syncedTitles', 'queue', 'status', 'extendedUnsupported', 'paused']);
+    return {
+        // Suspended measurement: the content scripts read this key themselves (see content.js).
+        // Nothing is gated here — the queue keeps draining while paused, because what was already
+        // measured belongs to the engine.
+        paused: !!s.paused,
+        engineIds: s.engineIds || {},
+        // Document title in the editor: the last one seen, and the one from the last send to the engine.
+        titles: s.titles || {},
+        syncedTitles: s.syncedTitles || {},
+        queue: s.queue || [],
+        status: s.status || { state: 'idle' },
+        extendedUnsupported: !!s.extendedUnsupported,
+    };
+}
+
+async function setStatus(status) {
+    await chrome.storage.local.set({ status: { ...status, at: new Date().toISOString() } });
+    await refreshBadge();
+}
+
+// Every read/write of the queue goes through this lock: a send and a new
+// measurement never step on each other (nor create two documents for the same one).
+let lock = Promise.resolve();
+function withLock(fn) {
+    const run = lock.then(fn, fn);
+    lock = run.catch(() => {});
+    return run;
+}
+
+// --- 2. ENGINE API ---
+// The engine authenticates every request with an API token (Bearer), created at login and
+// kept in place of the password.
+function trimUrl(url) {
+    return url.replace(/\/+$/, '');
+}
+
+// JSON body of an engine response, or an HttpError carrying its error message.
+async function readResponse(res) {
+    if (!res.ok) {
+        let message = res.statusText;
+        let code = '';
+        try {
+            const body = await res.json();
+            message = body.error || message;
+            code = body.code || '';
+        } catch (_) { /* non-JSON body */ }
+        throw new HttpError(res.status, message, code);
+    }
+    // The metrics 201 returns the text "Created" (Fiber's SendStatus): only JSON is read.
+    if (!(res.headers.get('Content-Type') || '').includes('application/json')) return null;
+    return res.json();
+}
+
+async function api(config, method, path, body) {
+    return readResponse(await fetch(trimUrl(config.engineUrl) + path, {
+        method,
+        headers: {
+            'Authorization': `Bearer ${config.token}`,
+            'Content-Type': 'application/json',
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+    }));
+}
+
+// Gets an API token from an email/password: log in (session token), then
+// create an API token with no expiry, revocable from the Certimens space. The session
+// token, now useless, is revoked. Returns { me, token, tokenId }.
+async function createApiToken(engineUrl, email, password) {
+    const url = trimUrl(engineUrl);
+    const me = await readResponse(await fetch(url + '/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+    }));
+    const bearer = { 'Authorization': `Bearer ${me.token}`, 'Content-Type': 'application/json' };
+    const token = await readResponse(await fetch(url + '/api/auth/tokens', {
+        method: 'POST',
+        headers: bearer,
+        body: JSON.stringify({ label: t('token.browser', { date: new Date().toLocaleDateString(dateLocale()) }) }),
+    }));
+    try {
+        await fetch(url + '/api/auth/logout', { method: 'POST', headers: bearer });
+    } catch (_) { /* network: the session token will expire on its own */ }
+    return { me, token: token.token, tokenId: token.id };
+}
+
+// Creates the document's engine document if needed. editorTitle is the document title in
+// the editor at that moment: it serves as the reference for detecting a later rename, even if the
+// file was given another name in the popup.
+async function ensureDocument(config, engineIds, item, editorTitle = item.documentName) {
+    if (engineIds[item.documentId]) return engineIds[item.documentId];
+    const file = await api(config, 'POST', '/api/documents', { name: item.documentName });
+    engineIds[item.documentId] = file.id;
+    const { syncedTitles = {} } = await chrome.storage.local.get('syncedTitles');
+    syncedTitles[item.documentId] = editorTitle;
+    await chrome.storage.local.set({ engineIds, syncedTitles });
+    return file.id;
+}
+
+// Propagates to the engine any documents renamed in the editor (Google Docs, Word Online).
+// The name chosen in the popup is kept as long as the document title doesn't change.
+async function syncTitles(config, state) {
+    for (const [documentId, title] of Object.entries(state.titles)) {
+        const engineId = state.engineIds[documentId];
+        if (!engineId || state.syncedTitles[documentId] === title) continue;
+        try {
+            await api(config, 'PUT', `/api/documents/${engineId}`, { name: title });
+        } catch (err) {
+            if (err.status !== 404) throw err; // 404: file deleted, recreated on the next send
+        }
+        state.syncedTitles[documentId] = title;
+        await chrome.storage.local.set({ syncedTitles: state.syncedTitles });
+    }
+}
+
+// Document title seen by the content script (on open, then on every change).
+function noteTitle(documentId, title) {
+    if (!documentId || !title) return Promise.resolve();
+    return withLock(async () => {
+        const { titles } = await getState();
+        if (titles[documentId] === title) return;
+        titles[documentId] = title;
+        await chrome.storage.local.set({ titles });
+    }).then(drain);
+}
+
+// Login from the popup: the password is exchanged for an API token, the only thing kept
+// (the engine accepts the rest only if the credentials are valid).
+async function login({ engineUrl, email, password }) {
+    const { me, token, tokenId } = await createApiToken(engineUrl, email, password);
+    // A new engine may well know the extended metrics the previous one refused.
+    await chrome.storage.local.set({
+        config: {
+            engineUrl: trimUrl(engineUrl), email: me.email || email,
+            // The engine always computes a display name, and falls back to the e-mail itself
+            // when the account has no first or last name. An engine too old to send it leaves
+            // this empty, and the windows fall back to the e-mail on their own.
+            displayName: me.display_name || '', token, tokenId, language: me.language || '',
+        },
+        extendedUnsupported: false,
+    });
+    await setStatus({ state: 'idle' }); // clears any auth_error before the next send
+    return me;
+}
+
+// Explicit (popup) creation of a document's engine document; no-op if it already exists.
+function createFileFor(documentId, documentName, editorTitle) {
+    return withLock(async () => {
+        const config = await getConfig();
+        const { engineIds } = await getState();
+        const existed = !!engineIds[documentId];
+        const engineId = await ensureDocument(config, engineIds, { documentId, documentName }, editorTitle || documentName);
+        return { engineId, existed };
+    });
+}
+
+// `offline` comes last, and only on a window that was written while the engine was out of
+// reach. The engine recognises a plugin's serializer by the **order** of its keys: it knows
+// `{type, value, period}` and that same shape with `offline` appended, and nothing else. A key
+// inserted anywhere else, or sent always, makes every honest push look hand-written.
+function toMetrics(item, dropExtended) {
+    return Object.entries(item.values)
+        .filter(([type]) => !(dropExtended && EXTENDED_TYPES.has(type)))
+        .map(([type, value]) => (item.offline
+            ? { type, value, period: item.period, offline: true }
+            : { type, value, period: item.period }));
+}
+
+async function pushItem(config, state, item) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const engineId = await ensureDocument(config, state.engineIds, item);
+        try {
+            await api(config, 'POST', `/api/documents/${engineId}/metrics`, { metrics: toMetrics(item, state.extendedUnsupported) });
+            return;
+        } catch (err) {
+            if (err.status === 404) {
+                // file deleted on the engine side: we recreate one for this document
+                delete state.engineIds[item.documentId];
+                await chrome.storage.local.set({ engineIds: state.engineIds });
+            } else if (err.status === 400 && err.code === 'metric_type_unknown' && !state.extendedUnsupported) {
+                // Only this code means the engine is older than the extended metrics. Any other
+                // 400 (an invalid period, a malformed body) used to latch this flag too, and the
+                // browser then stopped sending paste_events, focus_losses and median_flight_ms
+                // for good — the engine showed no "sorties du document" ever again.
+                state.extendedUnsupported = true;
+                await chrome.storage.local.set({ extendedUnsupported: true });
+                console.warn('Certimens: moteur sans les mesures étendues, elles ne sont plus envoyées.');
+            } else {
+                throw err;
+            }
+        }
+    }
+}
+
+// Engine file associated with a document (null if not yet created or deleted on the engine side).
+async function docInfo(documentId) {
+    const { engineIds } = await getState();
+    const engineId = engineIds[documentId];
+    if (!engineId) return { engineId: null, file: null };
+    try {
+        return { engineId, file: await api(await getConfig(), 'GET', `/api/documents/${engineId}`) };
+    } catch (err) {
+        if (err.status !== 404) throw err;
+        await withLock(async () => {
+            const state = await getState();
+            delete state.engineIds[documentId];
+            await chrome.storage.local.set({ engineIds: state.engineIds });
+        });
+        return { engineId: null, file: null };
+    }
+}
+
+// Assignments the student is enrolled in. Submitting a file to an assignment is reserved for
+// students: for any other role (teacher, administrator, free account), no assignments.
+async function listAssignments() {
+    const config = await getConfig();
+    const me = await api(config, 'GET', '/api/auth/me');
+    if (me.role !== 'student') return [];
+    return api(config, 'GET', '/api/assignments');
+}
+
+// Exports a Google Doc using the student's session. Done here rather than in the tab:
+// Google redirects to googleusercontent.com, readable thanks to the extension's host permissions
+// but not from the page. An expired session returns the login page (HTML).
+async function exportGoogleDoc(documentId, format) {
+    if (!/^[a-zA-Z0-9_-]+$/.test(documentId)) throw new HttpError(0, t('error.invalidGoogleDoc'));
+    // Firefox (and Chrome when site access is restricted) doesn't automatically grant the manifest
+    // hosts: without them, the export redirect is blocked by CORS.
+    if (!(await chrome.permissions.contains({ origins: GOOGLE_EXPORT_ORIGINS }))) {
+        throw new HttpError(0, t('error.exportPermission'));
+    }
+    let res;
+    try {
+        res = await fetch(`https://docs.google.com/document/d/${documentId}/export?format=${format}`, { credentials: 'include' });
+    } catch (err) {
+        throw new HttpError(0, t('error.exportBlocked', { message: err.message }));
+    }
+    if (!res.ok) throw new HttpError(0, t('error.exportRefused', { status: res.status }));
+    if ((res.headers.get('Content-Type') || '').includes('text/html')) {
+        throw new HttpError(0, t('error.exportExpired'));
+    }
+    return res;
+}
+
+// Character count of the document, excluding line breaks (like the engine's .docx count).
+async function googleDocVolume(documentId) {
+    const text = await (await exportGoogleDoc(documentId, 'txt')).text();
+    return [...text.replace(/[\r\n\uFEFF\u200B]/g, '')].length;
+}
+
+function toBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(binary);
+}
+
+// Sends a document's .docx to its engine document (replaces the already-sent document): the
+// content comes from the popup (chosen file, Word Online), otherwise from the Google Docs export.
+async function uploadDocx({ documentId, document }) {
+    const { engineIds } = await getState();
+    const engineId = engineIds[documentId];
+    if (!engineId) throw new HttpError(404, t('error.noFile'));
+    if (!document) {
+        if (documentId.startsWith('word:')) throw new HttpError(0, t('error.pickDocx'));
+        document = toBase64(await (await exportGoogleDoc(documentId, 'docx')).arrayBuffer());
+    }
+    if (document.length > MAX_UPLOAD_BASE64) throw new HttpError(413, t('error.tooLarge'));
+    return api(await getConfig(), 'PUT', `/api/documents/${engineId}`, { document });
+}
+
+// The engine silently ignores an assignment the student isn't enrolled in: we detect it.
+async function submitDocument(engineId, assignmentId) {
+    const file = await api(await getConfig(), 'PUT', `/api/documents/${engineId}`, { assignment_id: assignmentId });
+    if (file.assignment_id !== assignmentId) throw new HttpError(403, t('error.notEnrolled'));
+    return file;
+}
+
+// Document opened without an engine document: we open the popup (once per document and per browser
+// session) so the student creates their file and picks the assignment.
+async function promptUnknownDocument(documentId, tab) {
+    const config = await getConfig();
+    const { engineIds, status } = await getState();
+    if (!hasAuth(config) || status.state === 'auth_error' || engineIds[documentId]) return;
+    const { prompted = [] } = await chrome.storage.session.get('prompted');
+    if (prompted.includes(documentId)) return;
+    await chrome.storage.session.set({ prompted: [...prompted, documentId] });
+    try {
+        await chrome.action.openPopup({ windowId: tab.windowId });
+    } catch (_) {
+        // browser that refuses to open without a click (Firefox, Chrome < 127): badge on the tab
+        await chrome.action.setBadgeText({ tabId: tab.id, text: 'NEW' });
+        // Slate: this badge is a call to action, and slate is what actions are made of.
+        await chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: '#1e293b' });
+    }
+}
+
+// --- 3. QUEUE ---
+function failureStatus(err) {
+    return err.status === 401
+        ? { state: 'auth_error', message: t('sync.auth_error') }
+        : { state: 'offline', message: err.message };
+}
+
+// A window written while the engine was out of reach is stamped here, once, at the moment it
+// is queued — not when it finally leaves. What tells us is our own last attempt, not
+// navigator.onLine: a captive portal answers the link layer and never the engine, and the
+// three other agents have no such API to begin with.
+function enqueue(item) {
+    return withLock(async () => {
+        const { queue, status } = await getState();
+        queue.push(status.state === 'offline' ? { ...item, offline: true } : item);
+        await chrome.storage.local.set({ queue: queue.slice(-MAX_QUEUE) });
+    });
+}
+
+function drain() {
+    return withLock(async () => {
+        const [config, state] = await Promise.all([getConfig(), getState()]);
+        if (!hasAuth(config)) {
+            await setStatus({ state: 'unconfigured' });
+            return;
+        }
+        while (state.queue.length > 0) {
+            const item = state.queue[0];
+            try {
+                await pushItem(config, state, item);
+            } catch (err) {
+                if (err.status === 400) {
+                    // measurement rejected by the engine: resending it would block the queue forever
+                    console.warn('Certimens: mesure rejetée', err.message, item);
+                } else {
+                    await setStatus(failureStatus(err));
+                    return;
+                }
+            }
+            state.queue.shift();
+            await chrome.storage.local.set({ queue: state.queue });
+        }
+        try {
+            await syncTitles(config, state);
+        } catch (err) {
+            await setStatus(failureStatus(err));
+            return;
+        }
+        await setStatus({ state: 'synced' });
+    });
+}
+
+// --- 4. BADGE ---
+// The badge carries a state, not the brand: it uses the verdict colors the engine keeps outside
+// its brand guidelines (green / orange / red), not the slate and gold of the rest of the UI.
+async function refreshBadge() {
+    const { queue, status, paused } = await getState();
+    let text = 'ON';
+    let color = '#137333';
+    if (paused) {
+        // Slate, not a verdict colour: a pause is a choice the student made, not a problem — but
+        // it must be visible on every tab, all the time.
+        text = 'II';
+        color = '#1e293b';
+    } else if (status.state === 'unconfigured' || status.state === 'auth_error') {
+        text = 'OFF';
+        color = '#c5221f';
+    } else if (queue.length > 0) {
+        text = String(Math.min(queue.length, 999));
+        color = '#b06000';
+    }
+    await chrome.action.setBadgeText({ text });
+    await chrome.action.setBadgeBackgroundColor({ color });
+}
+
+// --- 5. DEBUG MODE ---
+// Switched on from the options page: the last measurement windows are kept, so what the sensor
+// counts can be compared with what the engine displays. Counters only, never any text.
+const DEBUG_LOG_MAX = 30;
+
+async function debugRecord(entry) {
+    const { debug, debugLog = [] } = await chrome.storage.local.get(['debug', 'debugLog']);
+    if (!debug) return;
+    console.log('Certimens:', entry);
+    await chrome.storage.local.set({ debugLog: [...debugLog, { at: new Date().toISOString(), ...entry }].slice(-DEBUG_LOG_MAX) });
+}
+
+// --- 6. EVENTS ---
+function logFailure(err) {
+    console.warn('Certimens:', err);
+}
+
+// Fire-and-forget messages sent by the content script.
+const NOTIFICATIONS = {
+    CERTIMENS_METRICS(message) {
+        const { documentId, documentName, period, values, reason } = message;
+        enqueue({ documentId, documentName, period, values }).then(drain).catch(logFailure);
+        debugRecord({ documentName, reason, values }).catch(logFailure);
+    },
+    CERTIMENS_DOC_OPENED(message, sender) {
+        noteTitle(message.documentId, message.documentName).catch(logFailure);
+        if (sender.tab) promptUnknownDocument(message.documentId, sender.tab).catch(logFailure);
+    },
+    CERTIMENS_DOC_TITLE(message) {
+        noteTitle(message.documentId, message.documentName).catch(logFailure);
+    },
+};
+
+// Requests from the popup, the options page and the content script. Each handler returns the
+// response fields: the caller gets { ok: true, ...fields } or { ok: false, status, message }.
+const REQUESTS = {
+    async CERTIMENS_STATUS() {
+        const [config, state] = await Promise.all([getConfig(), getState()]);
+        return {
+            engineUrl: config.engineUrl,
+            email: config.email,
+            displayName: config.displayName,
+            language: config.language,
+            configured: hasAuth(config),
+            queued: state.queue.length,
+            documents: Object.keys(state.engineIds).length,
+            status: state.status,
+            extendedDropped: state.extendedUnsupported,
+            paused: state.paused,
+        };
+    },
+    // Suspending stops the measurement in every open document; the queue keeps going. The
+    // content scripts flush their window when they see the key change.
+    async CERTIMENS_SET_PAUSED(message) {
+        await chrome.storage.local.set({ paused: !!message.paused });
+        await refreshBadge();
+        return { paused: !!message.paused };
+    },
+    async CERTIMENS_WHOAMI() {
+        const me = await api(await getConfig(), 'GET', '/api/auth/me');
+        drain();
+        return { me };
+    },
+    async CERTIMENS_LOGIN(message) {
+        return { me: await login(message) };
+    },
+    async CERTIMENS_LOGOUT() {
+        const config = await getConfig();
+        if (config.token && config.tokenId) {
+            try {
+                await api(config, 'DELETE', `/api/auth/tokens/${config.tokenId}`);
+            } catch (_) { /* already revoked or offline: the local token is wiped anyway */ }
+        }
+        await chrome.storage.local.set({ config: { engineUrl: config.engineUrl, email: config.email, language: config.language } });
+        return {};
+    },
+    CERTIMENS_DOC_INFO: (message) => docInfo(message.documentId),
+    async CERTIMENS_ASSIGNMENTS() {
+        return { assignments: await listAssignments() };
+    },
+    async CERTIMENS_GDOCS_VOLUME(message) {
+        return { volume: await googleDocVolume(message.documentId) };
+    },
+    async CERTIMENS_UPLOAD_DOCX(message) {
+        return { file: await uploadDocx(message) };
+    },
+    async CERTIMENS_SUBMIT_FILE(message) {
+        return { file: await submitDocument(message.engineId, message.assignmentId) };
+    },
+    CERTIMENS_CREATE_FILE: (message) => createFileFor(message.documentId, message.documentName, message.editorTitle),
+};
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (NOTIFICATIONS[message.type]) {
+        NOTIFICATIONS[message.type](message, sender);
+        return false;
+    }
+    const handler = REQUESTS[message.type];
+    if (!handler) return false;
+    Promise.resolve()
+        .then(() => handler(message, sender))
+        .then(
+            (fields) => sendResponse({ ok: true, ...fields }),
+            (err) => sendResponse({ ok: false, status: err.status || 0, message: err.message }),
+        );
+    return true; // async response
+});
+
+// The language every message this worker words is in: the account's, the browser's until the
+// student logs in. Applied on load rather than from init(), because a service worker is woken by
+// an alarm or a message far more often than it is installed or started with the browser — and a
+// worker that skipped this would word its refusals in French for an English account.
+function applyStoredLanguage() {
+    return getConfig().then((config) => setLanguage(config.language, chrome.i18n.getUILanguage()), () => {});
+}
+
+chrome.storage.onChanged.addListener((changes) => {
+    if (changes.config) applyStoredLanguage().then(drain);
+    if (changes.paused) refreshBadge();
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === RETRY_ALARM) drain();
+});
+
+function init() {
+    chrome.alarms.create(RETRY_ALARM, { periodInMinutes: 1 });
+    drain();
+}
+
+chrome.runtime.onInstalled.addListener((details) => {
+    init();
+    if (details.reason === 'install') chrome.runtime.openOptionsPage();
+});
+chrome.runtime.onStartup.addListener(init);
+
+applyStoredLanguage();

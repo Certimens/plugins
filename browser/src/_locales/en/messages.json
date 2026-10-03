@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "Certimens — Writing Agent",
+    "description": "Nom affiché dans le navigateur et dans la boutique."
+  },
+  "extensionDescription": {
+    "message": "Measures how you write in Google Docs and Word Online: counters, never your text. The document is sent only when you submit it.",
+    "description": "Description de la fiche : 132 caractères au maximum (limite du Chrome Web Store)."
+  }
+}

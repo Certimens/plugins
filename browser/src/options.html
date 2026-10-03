@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Certimens — Agent de rédaction</title>
+    <link rel="stylesheet" href="ui.css">
+    <style>
+        body { padding: 40px 16px; }
+        main { max-width: 480px; margin: 0 auto; }
+    </style>
+</head>
+<body>
+    <main class="stack">
+        <div class="card stack">
+            <div class="stack" style="gap: 8px">
+                <div class="brand"><img class="mark" src="icons/icon128.png" alt=""><h1>Certi<span class="mens">mens</span></h1><span id="version" class="version"></span></div>
+                <p class="muted" data-i18n="options.intro"></p>
+            </div>
+
+            <form id="form" class="stack">
+                <div class="field">
+                    <label for="email" data-i18n="login.email"></label>
+                    <input id="email" type="email" required autocomplete="username">
+                </div>
+                <div class="field">
+                    <label for="password" data-i18n="login.password"></label>
+                    <input id="password" type="password" required autocomplete="current-password">
+                </div>
+                <details id="advanced" class="advanced">
+                    <summary data-i18n="login.advanced"></summary>
+                    <div class="field">
+                        <label for="engineUrl" data-i18n="login.engineUrl"></label>
+                        <input id="engineUrl" type="url" placeholder="https://monespace.certimens.fr">
+                        <p class="muted small" data-i18n="login.engineUrlHelp"></p>
+                    </div>
+                </details>
+                <div class="actions">
+                    <button type="submit" class="btn" data-i18n="login.submit"></button>
+                    <button type="button" id="test" class="btn outlined" data-i18n="options.test"></button>
+                </div>
+            </form>
+            <div id="message" class="alert"></div>
+        </div>
+
+        <div class="card">
+            <h2 style="margin-bottom: 8px" data-i18n="options.sync"></h2>
+            <div id="status" class="status muted" data-i18n="options.loading"></div>
+        </div>
+
+        <div class="card stack" style="gap: 12px">
+            <div class="stack" style="gap: 6px">
+                <h2 data-i18n="options.debug"></h2>
+                <label class="row" style="justify-content: flex-start; gap: 8px">
+                    <input id="debug" type="checkbox" style="width: auto">
+                    <span data-i18n="options.debugLabel"></span>
+                </label>
+                <p class="muted small" data-i18n="options.debugHelp"></p>
+            </div>
+            <div id="debugLog" class="status muted small" data-i18n="options.emptyLog"></div>
+            <div class="actions">
+                <button type="button" id="clearLog" class="btn outlined" data-i18n="options.clearLog"></button>
+            </div>
+        </div>
+
+        <p class="muted small" data-i18n="options.tokenNote"></p>
+    </main>
+
+    <script src="i18n.js"></script>
+    <script src="ui.js"></script>
+    <script src="options.js"></script>
+</body>
+</html>

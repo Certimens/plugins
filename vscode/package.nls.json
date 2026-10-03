@@ -1,0 +1,16 @@
+{
+    "extension.displayName": "Certimens — Agent de rédaction",
+    "extension.description": "Mesure la rédaction de votre code, fichier par fichier, et la transmet à votre espace Certimens. Aucun texte ne quitte votre poste sans votre action.",
+    "view.title": "Certimens",
+    "view.name": "Agent de rédaction",
+    "command.login": "Certimens : se connecter",
+    "command.logout": "Certimens : se déconnecter",
+    "command.submit": "Certimens : rendre ce fichier",
+    "command.togglePause": "Certimens : suspendre ou reprendre la mesure",
+    "command.flush": "Certimens : envoyer les mesures en attente",
+    "command.focusPanel": "Certimens : ouvrir le panneau",
+    "configuration.title": "Certimens",
+    "configuration.exclude": "Chemins qui ne sont pas mesurés : dépendances, sortie de compilation, fichiers générés. Un fichier exclu ne crée aucun document côté moteur.",
+    "capability.untrustedWorkspaces": "L'agent observe la frappe et n'exécute rien du projet.",
+    "capability.virtualWorkspaces": "La mesure porte sur les fichiers d'un projet ouvert depuis le disque."
+}

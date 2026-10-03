@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Certimens — Agent de rédaction</title>
+    <link rel="stylesheet" href="ui.css">
+    <style>
+        body { padding: 16px; }
+        h1 { font-size: 1.35rem; }
+        h2 { font-size: 1.0625rem; font-weight: 700; letter-spacing: 0; }
+        .brand .mark { width: 24px; height: 24px; }
+        .card { padding: 16px; }
+    </style>
+    <!-- Office.js must be loaded from Microsoft's CDN (required by AppSource). -->
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <script>
+        /* Cache recovery. Deliberately **inline**: this is the only code that arrives with the
+           page, so the only code still running when the files below are stale or mismatched.
+           The pane loads six files, each with its own ten-minute lifetime on GitHub Pages — and
+           Word keeps a cache of its own, more stubborn still. After a deployment they can be
+           picked up at different moments, and a new taskpane.js then runs against the previous
+           ui.js.
+
+           Two triggers, one action, once per session:
+             1. this page is stale — the site announces a build other than the one written here;
+             2. the files are mismatched — loading threw, which is what a mismatch looks like.
+
+           The action re-fetches every file past the caches (`cache: 'reload'` writes the fresh
+           copy into the HTTP cache) and reloads. The guard matters more than the feature: a
+           reload loop would hit every student at once and be far worse than the bug it chases,
+           so it runs **once per session** and never retries.
+
+           It checks at load and never polls: the pane may stay open for hours, and reloading
+           while the student is writing would cost the window in progress. */
+        (function () {
+            var BUILD = '{{VERSION}}';
+            var FILES = ['taskpane.html', 'ui.css', 'i18n.js', 'ui.js', 'agent.js', 'sensor.js', 'taskpane.js'];
+            var ONCE = 'certimens.recovered';
+            var STARTUP_MS = 15000;
+            var loadedAt = Date.now();
+
+            function recover(reason) {
+                try {
+                    if (sessionStorage.getItem(ONCE)) return;
+                    sessionStorage.setItem(ONCE, reason);
+                } catch (e) {
+                    return; // no sessionStorage, no guard: better to change nothing
+                }
+                Promise.all(FILES.map(function (file) {
+                    return fetch(file, { cache: 'reload' }).catch(function () {});
+                })).then(function () {
+                    location.reload();
+                });
+            }
+
+            fetch('version.txt', { cache: 'no-store' })
+                .then(function (res) { return res.ok ? res.text() : ''; })
+                .then(function (live) {
+                    if (live.trim() && live.trim() !== BUILD) recover('version');
+                })
+                .catch(function () {});
+
+            window.addEventListener('error', function () {
+                if (Date.now() - loadedAt < STARTUP_MS) recover('erreur');
+            });
+        })();
+    </script>
+</head>
+<body class="stack" style="gap: 12px">
+    <div class="brand">
+        <img class="mark" src="icons/icon128.png" alt="">
+        <h1>Certi<span class="mens">mens</span></h1>
+        <div id="actions" class="icon-actions" hidden>
+            <button type="button" id="pause" class="icon-btn" aria-pressed="false">
+                <svg id="iconPause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9.5 5v14M14.5 5v14"/></svg>
+                <svg id="iconPlay" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true" hidden><path d="M8 5.5l11 6.5-11 6.5z"/></svg>
+            </button>
+            <button type="button" id="logout" class="icon-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9"/><path d="M17.5 8.5 21 12l-3.5 3.5"/><path d="M21 12H10"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <form id="login" class="card stack" hidden>
+        <p class="muted" data-i18n="login.intro"></p>
+        <div class="field">
+            <label for="email" data-i18n="login.email"></label>
+            <input id="email" type="email" required autocomplete="username">
+        </div>
+        <div class="field">
+            <label for="password" data-i18n="login.password"></label>
+            <input id="password" type="password" required autocomplete="current-password">
+        </div>
+        <details id="advanced" class="advanced">
+            <summary data-i18n="login.advanced"></summary>
+            <div class="field">
+                <label for="engineUrl" data-i18n="login.engineUrl"></label>
+                <input id="engineUrl" type="url" placeholder="https://monespace.certimens.fr">
+                <p class="muted small" data-i18n="login.engineUrlHelp"></p>
+            </div>
+        </details>
+        <button type="submit" class="btn block" data-i18n="login.submit"></button>
+    </form>
+
+    <div id="account" class="stack" style="gap: 12px" hidden>
+        <div class="small">
+            <span class="muted"><span data-i18n="account.connected"></span> <strong id="who" style="color: var(--text)"></strong></span>
+            <div id="whoEmail" class="muted" hidden></div>
+        </div>
+        <div id="pausedAlert" class="alert error small" hidden data-i18n="pause.alert"></div>
+
+        <div class="card stack">
+            <div class="muted small" data-i18n="doc.open"></div>
+            <div id="linked" class="stack" style="gap: 6px" hidden>
+                <h2 id="linkedName"></h2>
+                <div class="alert ok small" data-i18n="doc.linked"></div>
+                <div id="submitted" class="muted small" hidden></div>
+                <a id="open" class="small" target="_blank" rel="noopener" data-i18n="doc.openInCertimens"></a>
+                <div class="stack" style="gap: 6px; margin-top: 6px">
+                    <button type="button" id="uploadDocx" class="btn outlined block" data-i18n="upload.sendDocx"></button>
+                    <div id="uploadHint" class="muted small"></div>
+                </div>
+            </div>
+            <form id="create" class="stack" hidden>
+                <div class="field">
+                    <label for="documentName" data-i18n="doc.name"></label>
+                    <input id="documentName" type="text" required>
+                </div>
+            </form>
+            <div id="assignmentBox" class="field" hidden>
+                <label for="assignment" data-i18n="assignment.label"></label>
+                <select id="assignment"></select>
+            </div>
+            <button type="submit" form="create" id="createBtn" class="btn block" hidden data-i18n="doc.create"></button>
+            <button type="button" id="submit" class="btn block" hidden></button>
+        </div>
+    </div>
+
+    <div id="message" class="alert small"></div>
+
+    <div id="sync" class="muted small"></div>
+    <div id="webNote" class="muted small" hidden data-i18n="word.webNote"></div>
+
+    <script src="i18n.js"></script>
+    <script src="ui.js"></script>
+    <script src="agent.js"></script>
+    <script src="sensor.js"></script>
+    <script src="taskpane.js"></script>
+</body>
+</html>

@@ -1,0 +1,335 @@
+"""Writing measurement windows: the logic of browser/content.js, without LibreOffice.
+
+Receives already-translated events (key, click, paste, leaving the document) and keeps the
+counters of one measurement window. No key is retained: only its category
+(erase, navigation, shortcut) and the time of the keystroke. sensor.py wires this logic to
+LibreOffice's events; tests/test_measure.py checks it without LibreOffice.
+"""
+
+import re
+import unicodedata
+
+FLUSH_KEYSTROKES = 200      # flush at 200 keystrokes, like the desktop agents
+IDLE_FLUSH_S = 2.0          # flush after 2 s with no activity
+FLIGHT_MAX_MS = 800         # beyond this, the gap between two keystrokes is not a "flight time"
+PAUSE_MIN_S = 3             # cognitive pause: inactivity between 3 s and PAUSE_MAX_S then resuming
+# PAUSE_MAX_S bounds what counts as thinking rather than leaving. It was 60 s, which made every
+# deliberation longer than a minute count as *nothing at all* — neither a pause nor effective
+# time — although pausing one to five minutes over a paragraph is the clearest mark of someone
+# actually composing. Beyond five minutes the student has left the document, which is not
+# cognitive friction. ACTIVE_GAP_MAX_S stays at 60 s: it bounds a different rule (what a gap adds
+# to the effective time), and the two were only ever the same number by accident.
+PAUSE_MAX_S = 300
+ACTIVE_GAP_MAX_S = 60       # beyond this a gap adds nothing to the effective time
+INJECTION_MIN_CHARS = 15    # a shorter paste is not counted as an injection
+MAX_FLIGHTS = 500
+# A text the student sends to a corrector (Scribens, Antidote, a translator) and pastes back is
+# not an injection: it is their own writing, revised. What leaves the document is remembered as
+# hashed word shingles — never as text — and a paste that overlaps them enough is counted as the
+# massive revision it is. A corrector changes a few words in a hundred, so four-word shingles
+# survive it in large majority; 70 % leaves room for a rewritten sentence or two.
+SHINGLE_WORDS = 4           # a shingle is four consecutive words
+SELF_PASTE_RATIO = 0.7      # overlap above which a paste is the student's own text
+SELF_PASTE_TTL_S = 600      # how long what left the document stays comparable
+SELF_PASTE_MAX_COPIES = 5   # only the last copies are kept: the memory is bounded
+
+NOT_A_WORD = re.compile(r'[\W_]+', re.UNICODE)
+
+# Key categories (sensor.py translates the com.sun.star.awt.Key codes).
+ERASE = 'erase'             # Backspace, Delete
+NAVIGATION = 'navigation'   # arrows, Home/End, Page Up/Down
+MODIFIER = 'modifier'       # a modifier key alone
+OTHER = 'other'
+
+
+def median(values):
+    if not values:
+        return 0
+    ordered = sorted(values)
+    mid = len(ordered) // 2
+    return ordered[mid] if len(ordered) % 2 else (ordered[mid - 1] + ordered[mid]) / 2
+
+
+def median_absolute_deviation(values):
+    """Median absolute deviation (MAD) of the flight times: regularity of the typing rhythm."""
+    if len(values) < 2:
+        return 0
+    med = median(values)
+    return median([abs(v - med) for v in values])
+
+
+def normalize_words(text):
+    """Normalisation absorbs exactly what a corrector changes: case, accents, punctuation and
+    spacing. What is left is the sequence of words, which a correction leaves nearly intact."""
+    stripped = ''.join(c for c in unicodedata.normalize('NFD', text) if not unicodedata.combining(c))
+    return NOT_A_WORD.sub(' ', stripped.lower()).split()
+
+
+def hash_shingle(words):
+    """FNV-1a over the words of a shingle: what is kept is a number, from which the words cannot
+    be read back. The same function, on the same text, gives the same number in the four agents
+    (browser/src/content.js holds the JavaScript twin)."""
+    value = 0x811c9dc5
+    for char in ' '.join(words):
+        value ^= ord(char)
+        value = (value * 0x01000193) & 0xFFFFFFFF
+    return value
+
+
+def shingles(text):
+    words = normalize_words(text)
+    return {hash_shingle(words[i:i + SHINGLE_WORDS])
+            for i in range(len(words) - SHINGLE_WORDS + 1)}
+
+
+class Window:
+    """Counters for one measurement window."""
+
+    def __init__(self):
+        self.start = None
+        self.last = None
+        self.keystrokes = 0
+        self.active_ms = 0
+        self.injected_chars = 0
+        self.corrections = 0
+        self.reformulations = 0
+        self.macro_revisions = 0
+        self.navigation = 0
+        self.pauses = 0
+        self.paste_events = 0
+        self.focus_losses = 0
+        self.flights = []
+
+
+class Measure:
+    """Measurement of a document. Times are in seconds (time.time()).
+
+    The on_* methods return the reason for an immediate flush ('save', 'volume') or None;
+    the caller handles the idle delay (IDLE_FLUSH_S after last_activity()).
+    """
+
+    def __init__(self):
+        self.window = Window()
+        self.last_press = 0
+        self.last_event = 0
+        self.last_activity = 0
+        self.is_navigating = False
+        self.clicked_recently = False
+        # Scope of the selection the next keystroke would replace: 'all' for a Ctrl+A, 'range'
+        # for a Shift+navigation selection, None for none. Typing or pasting over a selection
+        # deletes it — a revision the sensor used to miss, watching only the erase keys.
+        # (browser/content.js does the same; it can also see a mouse-dragged selection, which
+        # LibreOffice's click handler does not report.)
+        self.selection_scope = None
+        # What left the document for a corrector, hashed: [(when, frozenset of shingles)].
+        self.own_text = []
+
+    # --- restitution of one's own text ---
+    def on_copy(self, now, text):
+        """Copy or cut: what leaves the document is remembered, hashed, so that it can be
+        recognised if it comes back. Not an activity of its own — the Ctrl+C is already counted
+        as a keystroke, and a copy opens no measurement window."""
+        if not text:
+            return
+        marks = shingles(text)
+        if not marks:    # fewer than four words: nothing to recognise later
+            return
+        self.own_text.append((now, frozenset(marks)))
+        del self.own_text[:-SELF_PASTE_MAX_COPIES]
+
+    def _is_restitution(self, now, text):
+        """Is this paste the student's own text coming back? Containment rather than a symmetric
+        similarity: they may paste back one corrected paragraph out of the three they copied."""
+        self.own_text = [(when, marks) for when, marks in self.own_text
+                         if now - when < SELF_PASTE_TTL_S]
+        marks = shingles(text)
+        if not marks:
+            return False
+        seen = sum(1 for mark in marks if any(mark in kept for _, kept in self.own_text))
+        return seen / len(marks) >= SELF_PASTE_RATIO
+
+    # --- activity ---
+    def _mark(self, now):
+        if self.window.start is None:
+            self.window.start = now
+        self.window.last = now
+
+    def _pause(self, now):
+        """Resuming after 3 s to PAUSE_MAX_S of inactivity counts as a cognitive pause."""
+        if self.last_event > 0:
+            gap = now - self.last_event
+            if PAUSE_MIN_S < gap <= PAUSE_MAX_S:
+                self.window.pauses += 1
+        self.last_event = now
+
+    def _active_time(self, now):
+        """Effective time: the real gap if <= 2 s, a flat 250 ms if < ACTIVE_GAP_MAX_S, nothing beyond."""
+        if self.last_activity > 0:
+            gap_ms = (now - self.last_activity) * 1000
+            if gap_ms <= 2000:
+                self.window.active_ms += gap_ms
+            elif gap_ms < ACTIVE_GAP_MAX_S * 1000:
+                self.window.active_ms += 250
+        self.last_activity = now
+
+    def has_activity(self):
+        return self.window.keystrokes > 0 or self.window.paste_events > 0
+
+    def _consume_selection(self):
+        """Spend a pending selection as the deletion it is: a whole-document one weighs as a mass
+        revision, a Shift+navigation one as a deferred reformulation — the scale the erase keys
+        already use. Returns True when one was spent."""
+        if not self.selection_scope:
+            return False
+        if self.selection_scope == 'all':
+            self.window.macro_revisions += 1
+        else:
+            self.window.reformulations += 1
+        self.selection_scope = None
+        return True
+
+    # --- events ---
+    def on_key(self, now, category, ctrl=False, letter=None, shift=False):
+        """Key pressed (excluding auto-repeat). letter: 's', 'x', 'z'… with Ctrl/Cmd."""
+        # A modifier pressed on its own is not a keystroke: it writes nothing, and the near-zero
+        # gap it leaves before the character it modifies would pass for an impossibly fast one.
+        # browser/content.js drops it the same way; Word and VS Code, counting characters,
+        # never see one. Dropped before anything else, so a Shift pressed between a click and a
+        # Backspace no longer spends the click either.
+        if category == MODIFIER:
+            return None
+        w = self.window
+        self._mark(now)
+        self._pause(now)
+        if self.last_press > 0:
+            flight = (now - self.last_press) * 1000
+            if flight < FLIGHT_MAX_MS:
+                w.flights.append(flight)
+                if len(w.flights) > MAX_FLIGHTS:
+                    w.flights.pop(0)
+        self.last_press = now
+
+        # Ctrl+A selects the whole document; Shift with a navigation key extends a selection.
+        # Shift alone must not count: it is also how capitals are typed.
+        if ctrl and letter == 'a':
+            self.selection_scope = 'all'
+        elif shift and category == NAVIGATION:
+            self.selection_scope = 'range'
+
+        if category == ERASE:
+            # Erasing a selection is scored by what it spans, not by what preceded it.
+            if self._consume_selection():
+                pass
+            elif self.clicked_recently:
+                w.macro_revisions += 1
+            elif self.is_navigating:
+                w.reformulations += 1
+            else:
+                w.corrections += 1
+            # The jump is spent on this deletion: what follows is erased on the spot and counts
+            # as immediate corrections (browser/content.js does the same).
+            self.is_navigating = False
+        elif category == NAVIGATION:
+            w.navigation += 1
+            self.is_navigating = True
+            # A navigation without Shift collapses the selection instead of extending it.
+            if not shift:
+                self.selection_scope = None
+        else:
+            # A character typed over a selection replaces it. Ctrl shortcuts act on the selection
+            # (copy, select-all) rather than replacing it, so they are excluded.
+            if not ctrl:
+                self._consume_selection()
+            self.is_navigating = False
+        self.clicked_recently = False
+
+        # Cutting or undoing settles the pending selection itself: the cut is the very deletion
+        # the selection was waiting for, and an undo collapses it. Left pending, it would be
+        # spent a second time by the next character typed or pasted — one action, two revisions.
+        if ctrl and letter == 'x':
+            w.macro_revisions += 1
+            self.selection_scope = None
+        if ctrl and letter == 'z':
+            w.corrections += 1
+            self.selection_scope = None
+
+        self._active_time(now)
+        w.keystrokes += 1
+        if ctrl and letter == 's':
+            return 'save'
+        if w.keystrokes >= FLUSH_KEYSTROKES:
+            return 'volume'
+        return None
+
+    def on_click(self, now):
+        """Click in the body of the document: a navigation jump."""
+        self._mark(now)
+        self._pause(now)
+        self.window.navigation += 1
+        self.is_navigating = True
+        self.clicked_recently = True
+        # A click collapses whatever was selected. LibreOffice's handler reports no coordinates,
+        # so a dragged selection cannot be told from a plain click here — unlike the browser
+        # sensor, which measures the drag distance.
+        self.selection_scope = None
+
+    def on_paste(self, now, text):
+        """Paste (menu, shortcut or right-click): text is the clipboard's text."""
+        if not text:
+            return
+        self._mark(now)
+        self._pause(now)
+        # Pasting over a selection replaces it: "select everything, paste the answer" used to
+        # count as an injection only, never as a revision.
+        replaced = self._consume_selection()
+        chars = len(text.replace('\r', '').replace('\n', ''))
+
+        # The student's own text, come back from a corrector: a revision of what they wrote, not
+        # a paste of someone else's words. It is scored as the block it replaces — one keystroke
+        # for the block, as a deletion at the scale of a selection is — never as an injection.
+        if self._is_restitution(now, text):
+            if not replaced:
+                self.window.macro_revisions += 1
+            self.window.keystrokes += 1
+            return
+
+        self.window.paste_events += 1
+        if chars > INJECTION_MIN_CHARS:
+            self.window.injected_chars += chars
+
+    def on_focus_lost(self):
+        self.window.focus_losses += 1
+
+    # --- flush ---
+    def take(self, volume=None):
+        """Ends the window: returns (period, values) to send, or None if there was no activity."""
+        self.last_activity = 0
+        if not self.has_activity():
+            # Clicks alone: their counters carry over to the next window, but not their time,
+            # otherwise the period would swallow the inactivity that follows.
+            self.window.start = None
+            self.window.last = None
+            return None
+        done = self.window
+        self.window = Window()
+        end = max(done.last, done.start + 1)  # the engine requires end > start
+        values = {
+            'effective_time_seconds': round(done.active_ms / 1000),
+            'total_keystrokes': done.keystrokes,
+            'total_injected_chars': done.injected_chars,
+            'immediate_corrections': done.corrections,
+            'deferred_reformulations': done.reformulations,
+            'navigation_jumps': done.navigation,
+            'macro_revisions': done.macro_revisions,
+            'cognitive_pauses': done.pauses,
+            'paste_events': done.paste_events,
+            'focus_losses': done.focus_losses,
+        }
+        # Without at least two flight times, the rhythm is not measurable: we send nothing
+        # rather than a 0 that would skew the average.
+        if len(done.flights) >= 2:
+            values['mad_ms'] = round(median_absolute_deviation(done.flights), 2)
+            values['median_flight_ms'] = round(median(done.flights), 2)
+        if volume is not None:
+            values['real_volume'] = volume
+        return (done.start, end), values
