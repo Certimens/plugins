@@ -1,0 +1,1 @@
+../browser/check-install-scripts.mjs

@@ -1,0 +1,1 @@
+../../browser/src/i18n.js

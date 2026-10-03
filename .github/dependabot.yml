@@ -1,0 +1,54 @@
+# Dependency updates. One entry per ecosystem **and per project**: the repository holds four
+# autonomous agents, each with its own manifest and lockfile, and nothing of its own at the
+# root. A missing entry means that project is simply never updated, which is the failure mode
+# to watch for when adding a new one.
+version: 2
+updates:
+  # Browser agent: ESLint, Stylelint, html-validate, web-ext, publish-browser-extension.
+  - package-ecosystem: npm
+    directory: /browser
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    commit-message: { prefix: "chore(deps)" }
+    groups:
+      # Patch and minor bumps land as a single PR: they are the bulk of the noise and are
+      # reviewed as a batch. Majors stay separate — they need reading.
+      npm-minor:
+        update-types: [minor, patch]
+
+  # Word agent: ESLint, html-validate, office-addin-*.
+  - package-ecosystem: npm
+    directory: /word
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    commit-message: { prefix: "chore(deps)" }
+    groups:
+      npm-minor:
+        update-types: [minor, patch]
+
+  # VS Code agent: ESLint and vsce. Its package.json is also the extension's manifest, so a
+  # bump there is read with more care than elsewhere.
+  - package-ecosystem: npm
+    directory: /vscode
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    commit-message: { prefix: "chore(deps)" }
+    groups:
+      npm-minor:
+        update-types: [minor, patch]
+
+  # LibreOffice agent: requirements-dev.txt, which pins ruff. The extension's own code uses the
+  # standard library only and runs on the Python bundled with LibreOffice — nothing to update
+  # there, by design.
+  - package-ecosystem: pip
+    directory: /libreoffice
+    schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: "chore(deps)" }
+
+  # The workflows' own actions (ci.yml, release.yml, pages.yml). Easy to forget, and the one
+  # ecosystem where a stale pin is a supply-chain concern rather than a missing feature — these
+  # workflows hold the store credentials that publish to every browser.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: "chore(ci)" }

@@ -1,0 +1,269 @@
+/* The documentation site: what the Certimens website's stylesheet does not cover.
+ *
+ * ## Three sheets, and the order is the design
+ *
+ * Each page loads, in this order:
+ *
+ *   1. `assets/ui.css`          — the agents' own stylesheet, copied from browser/src/
+ *   2. `/assets/css/style.css`  — the **website's**, linked from the same host
+ *   3. `assets/site.css`        — this file, which has the last word
+ *
+ * The second one is the point. The documentation is served at `/plugins/` and the Certimens
+ * website at `/` **on the same origin**, so its stylesheet is one root-absolute link away: the
+ * style is not copied, not vendored, not pulled in as a submodule — it is the live file, and
+ * the day the website changes, these pages change with it. Nothing is redistributed either,
+ * which is what keeps an all-rights-reserved sheet and an AGPL repository from mixing.
+ *
+ * The same goes for the word mark and the footer logo: `/assets/img/…`, same host, linked.
+ *
+ * ## What that costs, and what this file is for
+ *
+ * The two sheets disagree. The website styles `.card`, `.btn`, `body`, `h1`, `p`, `a`; ui.css
+ * styles the same names for a **panel**. Loading the website's second means it wins everywhere
+ * — which is what a document wants, and exactly what the window illustrations must not have:
+ * they are the agents' own markup, and drawn in the website's type they would be showing the
+ * student a window that does not exist.
+ *
+ * So this file does two things and nothing else:
+ *
+ *   - it adds what a documentation page needs and a marketing site has no use for: numbered
+ *     steps, the grid of agents, the folded-away manual path, inline code;
+ *   - it puts the window back to what ui.css says, **inside `figure.window .frame` only**.
+ *
+ * The second list is short on purpose, and it is the one to check when the website changes: a
+ * rule of theirs on a class ui.css also uses will reach inside the frame, and the way to see it
+ * is to open a page. Nothing in the build can catch that — the stylesheet is not here.
+ *
+ * It also runs the other way, which is less obvious: ui.css brings **font faces** the website
+ * does not have (400 and 600 against its 500, 700, 800), both sheets name the same family, and
+ * the browser merges them. A `font-weight: 600` of theirs therefore resolves to a face that
+ * does not exist on their own site — see `.site-nav a` below.
+ *
+ * ## Nothing from a third origin
+ *
+ * This site shares its origin with the Word task pane, which keeps the student's API token in
+ * that origin's localStorage (see .claude/skills/securite-agents). Everything loaded here comes
+ * from that same origin: no CDN, no remote font, no analytics.
+ *
+ * The one script on the page is the website's own (`/assets/js/site.js`), which opens the menu
+ * the burger folds away. It is not a third party and not an addition to the origin: it already
+ * runs on every page the website serves from it. What would genuinely reduce the exposure is
+ * the task pane having a domain of its own, which is a separate matter and already written
+ * down. Nothing of ours is added here.
+ */
+
+/* --- What a documentation page needs ------------------------------------------------------ */
+
+/* The blocks are spaced by the flex gap of .stack, so the website's paragraph margin would add
+   itself to it. Headings keep a margin: a section has to breathe more than a paragraph. */
+.doc p { margin: 0; max-width: 68ch; }
+.doc h2 { margin: 24px 0 0; }
+/* ui.css's alert is laid out for a panel: 8 px of padding under 14 px of text. These notes are
+   read at the size of the page. */
+.doc .alert { margin: 0; padding: 12px 16px; }
+
+/* ui.css carries `--warning` but **no warning alert**: its three verdict colours are the
+   engine's, and only two of them are ever a block in an agent's window. A documentation page
+   needs the third — "an extension loaded this way is not updated" is a caution, not an error
+   and not a remark — so the pair is made here rather than added to a stylesheet four agents
+   ship. The wash is `--warning` at 8% over white, which is the rule ui.css states for the two
+   it has, and the text reads 10.5:1 on it, in the family of the 11:1 of the other two. */
+.alert.warning { color: #5c2a04; background: #f9f1eb; }
+
+/* ui.css underlines every link on hover; the website underlines none of them. Loading its
+   sheet after ui.css does not undo that — it only sets a colour — so navigation links came out
+   with **two** marks at once: the website's own gold bar, which `.site-nav a::after` grows under
+   the word, and ui.css's native underline over it.
+   The underline is given back where it is an affordance and not a decoration: inside the prose
+   of a page, where a link sits in a sentence and has to be told apart from it. */
+/* Same leak, quieter: ui.css gives every link `font-weight: 600`, and the website sets a weight
+   only where it means to (its navigation). Left alone, the footer and the prose came out bolder
+   than the same links on the website. The frame puts 600 back for the agent's own window. */
+a { font-weight: inherit; }
+
+/* **The website asks for 600 here and shows 700.** It ships three faces — 500, 700, 800 — and
+   no 600, so a browser matching `font-weight: 600` walks upwards and lands on 700. ui.css ships
+   400 and 600 as well, and both sheets name the same family, so every face is merged: on this
+   page the 600 exists, the very same declaration finds it, and the menu came out lighter than
+   the one above it on the website.
+   Aligning on what the website *renders* rather than on what it writes. This is the one leak
+   that runs the other way — not a rule of theirs reaching our markup, but a file of ours
+   changing how their rule resolves. */
+.site-nav a { font-weight: 700; }
+
+a:hover { text-decoration: none; }
+.doc p a:hover, .doc li a:hover { text-decoration: underline; }
+
+code {
+    padding: 1px 6px;
+    border: 1px solid var(--line, #e5e5e5);
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.875em;
+    background: var(--bg-soft, #f8fafc);
+}
+
+/* --- Numbered steps ----------------------------------------------------------------------- */
+
+ol.steps {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+}
+
+ol.steps li {
+    position: relative;
+    max-width: 68ch;
+    padding-left: 44px;
+    counter-increment: step;
+}
+
+/* Gold as a surface carries ink: the charter's one way of wearing gold, and the website's own
+   primary button follows it. */
+ol.steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 2px;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-size: 0.85rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--text, #1a202c);
+    background: var(--gold, #c5a059);
+}
+
+/* --- The agent cards of the home page ------------------------------------------------------ */
+/* The card itself is the website's — flat, a hairline, its border turning gold under the
+   pointer. All that is added is the grid, and a link that does not read as a link. */
+
+.agents {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
+}
+
+.agents a.card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    color: var(--text, #1a202c);
+}
+
+/* The website's own disc, which its `.card:hover` already turns gold. Two adjustments, and only
+   because our card is a flex column where its is a block: the disc must not stretch across it,
+   and the gap above replaces the margin it carries. */
+/* stylelint-disable-next-line selector-class-pattern -- the website's class, in its markup. */
+.agents .card__icon { align-self: flex-start; margin-bottom: 0; }
+
+.agents a.card strong { font-size: 1.15rem; font-weight: 700; color: var(--navy, #1e293b); }
+
+/* The website's own card text: muted, at the size of the page. It used to carry ui.css's
+   `.small` as well, which is 12 px — a panel's size, half a sentence on a document.
+
+   `:not(.card__icon)` is not decoration. The icon's wrapper is a span too, and this selector
+   weighs (0,2,1) against the website's `.card__icon` (0,1,0) and its `.card:hover .card__icon`
+   (0,2,0): it was winning both, painting the glyph muted grey on the slate disc — where the
+   website draws it white — and leaving it grey on the gold one, where the website turns it to
+   ink. The two states came out swapped, which is exactly what one sees. A component of theirs
+   stays dressed by them; what is written here addresses our own text and nothing else. */
+/* stylelint-disable-next-line selector-class-pattern -- the website's class, in its markup. */
+.agents a.card span:not(.card__icon) { color: var(--muted, #54595f); }
+
+/* --- The manual path, folded away ---------------------------------------------------------- */
+
+.doc details.advanced {
+    padding: 20px 24px;
+    border: 1px solid var(--line, #e5e5e5);
+    border-radius: var(--radius, 12px);
+    background: var(--bg-soft, #f8fafc);
+}
+
+.doc details.advanced > summary { font-size: 1rem; font-weight: 700; }
+.doc details.advanced[open] > summary { margin-bottom: 12px; }
+
+/* --- An illustration of one of our own windows ---------------------------------------------- */
+/*
+ * Not a screenshot and not a drawing: the window's own markup, styled by the very stylesheet
+ * the agent ships. Everything below puts back what the website's sheet took over, so the
+ * picture is of the window the student will actually open — and it is scoped to the frame, so
+ * none of it reaches the page around it.
+ */
+
+figure.window {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+}
+
+figure.window .frame {
+    /* The two palettes collide on exactly one name, and this is where it shows: ui.css means
+       `--bg: #f8fafc` (an agent's page) and the website means `--bg: #fff`. The website's sheet
+       loads second, so its value wins — on `:root`, therefore inside the frame as well. For the
+       page around it that is right, and it is why the body is white here like the body there.
+       For the illustration it is not: the window's card is white **on light grey**, and with
+       both white it reads flatter than the one the student opens. The value is put back on the
+       frame, where ui.css's rules below can reach it again; `--bg-soft` is the website's own
+       token for that very colour, so nothing is written twice. */
+    --bg: var(--bg-soft, #f8fafc);
+
+    width: 320px;
+    max-width: 100%;
+    padding: 16px;
+    border: 1px solid var(--divider);
+    border-radius: var(--radius);
+    background: var(--bg);
+    /* The agent's type, not the document's: ui.css reads 14 px over 1.5. */
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+    text-align: left;
+}
+
+/* The illustration is a picture: nothing in it is reachable or clickable. Declared before the
+   rules that follow, which are tighter — stylelint refuses a loose selector arriving after a
+   tight one for the same element. */
+figure.window .btn, figure.window .field input { pointer-events: none; }
+
+figure.window .frame > .stack { gap: 12px; }
+figure.window .frame p { margin: 0; }
+figure.window .frame h1 { margin: 0; font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em; }
+
+/* The window's card is 24 px of padding, not the 36 by 30 of a marketing card. */
+figure.window .frame .card {
+    padding: 24px;
+    border: 1px solid var(--divider);
+    border-radius: var(--radius);
+    background: var(--paper);
+}
+
+/* The window's button: full width, 15 px, the agent's own measures. */
+figure.window .frame .btn {
+    display: block;
+    width: 100%;
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--accent-ink);
+    background: var(--accent);
+    text-align: center;
+}
+
+figure.window figcaption {
+    max-width: 44ch;
+    font-size: 0.85rem;
+    color: var(--muted, #54595f);
+    text-align: center;
+}
