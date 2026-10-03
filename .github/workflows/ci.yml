@@ -1,0 +1,270 @@
+name: CI
+
+# Lint, tests and build on every branch and PR. Also called by release.yml, which publishes the
+# packages built here: a failing CI blocks publication.
+#
+# One job per project, because the repository holds four: each installs its own tooling and
+# calls its own Makefile, exactly as one would locally. An agent that breaks does not mask the
+# others (fail-fast is pointless here: the jobs are already independent).
+#
+# A fifth job checks what none of the four can see: what binds them together. It builds nothing
+# and installs nothing — it compares four files and the documentation.
+#
+# Then, **last**, three agents are started in their real host (a real Chromium, a real VS Code,
+# a real LibreOffice, each in a container): that is the only check that catches an agent that
+# installs and does nothing. The repository is public, its runner minutes are not counted, and
+# the alternative — remembering before every tag — is exactly what gets lost.
+#
+# `agent` only means something in a release: a tag concerns one agent, and republishing the
+# three others would have their stores review a package they already have. On a branch or a PR
+# the input is empty and all four run — that is where everything should be seen. Coherence, for
+# its part, runs **always**: it compares the four, including those a release does not build.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_call:
+    inputs:
+      agent:
+        description: The only agent to build (browser, word, libreoffice, vscode); empty, all four
+        type: string
+        default: ''
+      version:
+        description: Version imposed on the packages (release tag)
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  # The shared constants, the metrics sent and the shared files: a measurement rule is unique
+  # and its implementations are four, and this is the repository's only check that looks at them
+  # together. No tooling: python3 is on the runner.
+  coherence:
+    name: Four-agent coherence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: make check
+      # The documentation site is built here and nowhere else in the CI: it belongs to no agent,
+      # it needs nothing installed, and what it checks — the two languages holding the same
+      # pages, and the inline markup of the prose — has no other linter (docs/publication.md).
+      - run: make site
+
+  browser:
+    name: Browser extension
+    if: ${{ !inputs.agent || inputs.agent == 'browser' }}
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth 0: the build reads the last tag (git describe) to version a branch build.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: browser/package-lock.json
+      - run: make -C browser install
+      - run: make -C browser lint
+      - run: make -C browser test
+      - run: make -C browser build RELEASE="$VERSION"
+        env:
+          VERSION: ${{ inputs.version }}
+      - name: addons.mozilla.org validation
+        run: make -C browser lint-amo
+      # Store packages, taken as they are by release.yml.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: extension
+          path: browser/dist/*.zip
+      # Unpacked extension, per browser, to load it by hand: the downloaded artifact, once
+      # unzipped, is the folder to load.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: certimens-chrome
+          path: browser/dist/chrome/
+      - uses: actions/upload-artifact@v7
+        with:
+          name: certimens-firefox
+          path: browser/dist/firefox/
+      # The list of four only makes sense on a CI that builds all four: in a release a single
+      # agent runs and its packages are on the release page.
+      - name: Install instructions
+        if: ${{ !inputs.agent }}
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ### Install this build by hand ($(cat browser/dist/VERSION))
+
+          Download the artifact at the bottom of this page, then unzip it:
+
+          - **Chrome, Edge, Brave, Opera, Vivaldi, Arc**: \`certimens-chrome\` → \`chrome://extensions\`
+            (or \`edge://\`, \`brave://\`…) → *Developer mode* → *Load unpacked*
+            → the unzipped folder. To update: replace the folder, then ↻ on the extension's card.
+          - **Firefox**: \`certimens-firefox\` → \`about:debugging#/runtime/this-firefox\` →
+            *Load Temporary Add-on* → \`manifest.json\` of the unzipped folder
+            (removed when Firefox closes).
+          - **Safari**: \`safari-xcode\` (macOS job) → open the project in Xcode, see \`docs/extension-navigateur.md\`.
+          - **LibreOffice**: \`certimens-libreoffice\` → *Tools › Extension Manager ›
+            Add* → \`libreoffice.oxt\`, then restart LibreOffice.
+          - **Word**: \`certimens-word\` unzipped into \`word/dist/\` of a clone of the repository → \`make -C word serve\`,
+            then load \`word-localhost.xml\` in Word (see \`docs/complement-word.md\`).
+          - **VS Code**: \`certimens-vscode\` → \`code --install-extension certimens-vscode.vsix\`
+            (or *Extensions › … › Install from VSIX*), then reload the window.
+          EOF
+
+  word:
+    name: Word add-in
+    if: ${{ !inputs.agent || inputs.agent == 'word' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: word/package-lock.json
+      - run: make -C word install
+      - run: make -C word lint
+      - run: make -C word test
+      - run: make -C word build RELEASE="$VERSION"
+        env:
+          VERSION: ${{ inputs.version }}
+      - name: Office manifest validation
+        run: make -C word lint-manifest
+      # The add-in site (published to GitHub Pages by release.yml) and the local test manifest.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: certimens-word
+          path: |
+            word/dist/word/
+            word/dist/word-localhost.xml
+
+  libreoffice:
+    name: LibreOffice extension
+    if: ${{ !inputs.agent || inputs.agent == 'libreoffice' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # Nothing to install on the Node side: this agent is Python end to end, build included.
+      # ruff installs into libreoffice/.venv from requirements-dev.txt; python3-venv is already
+      # on the runner.
+      - run: make -C libreoffice install
+      - run: make -C libreoffice lint
+      - run: make -C libreoffice test
+      - run: make -C libreoffice build RELEASE="$VERSION"
+        env:
+          VERSION: ${{ inputs.version }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: certimens-libreoffice
+          path: libreoffice/dist/libreoffice.oxt
+
+  vscode:
+    name: VS Code extension
+    if: ${{ !inputs.agent || inputs.agent == 'vscode' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: vscode/package-lock.json
+      - run: make -C vscode install
+      - run: make -C vscode lint
+      - run: make -C vscode test
+      - run: make -C vscode build RELEASE="$VERSION"
+        env:
+          VERSION: ${{ inputs.version }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: certimens-vscode
+          path: vscode/dist/certimens-vscode.vsix
+
+  # The agents in their real host. This is the only check that catches the failure where an
+  # agent installs and does nothing: a manifest the browser refuses, a service worker that
+  # throws on startup, a command declared and never registered, an `.oxt` that `unopkg`
+  # refuses. No store reviews that.
+  #
+  # The same targets as locally, containers included: what the developer runs is what the CI
+  # runs. The repository is public, its runners are not counted — the only cost is time.
+  #
+  # Each one depends on **its own agent** only, and therefore carries no condition: a job whose
+  # `needs` failed or was skipped is skipped too, which is exactly what we want — no point
+  # starting an editor if the unit tests are red, nor building the host of an agent a release
+  # does not publish. Waiting for all three would also make them wait on each other for nothing.
+  #
+  # No matrix: a job's `if` is evaluated **before** its expansion, so `matrix` is not available
+  # there — that is a workflow compilation error, not a job one would see skip itself. Three
+  # blocks written out, like the four agent jobs above.
+  host-browser:
+    name: Browser extension in its host
+    needs: browser
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth 0: the unpacked package is built here too, and its version comes from the tag.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: browser/package-lock.json
+      - run: make -C browser test-host
+
+  host-libreoffice:
+    name: LibreOffice extension in its host
+    needs: libreoffice
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # Nothing to install on the Node side: the .oxt is built by python3, already on the runner.
+      - run: make -C libreoffice test-host
+
+  # The Word add-in has no job here, and will not have one: Office.js only runs inside Word,
+  # of which there is no headless version (word/TESTING.md).
+  host-vscode:
+    name: VS Code extension in its host
+    needs: vscode
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: vscode/package-lock.json
+      - run: make -C vscode test-host
+
+  safari:
+    name: Safari (Xcode)
+    needs: browser
+    if: ${{ !inputs.agent || inputs.agent == 'browser' }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: extension
+          path: browser/dist
+      - name: Unpack
+        run: unzip -q browser/dist/safari.zip -d browser/dist/safari
+      - name: Convert and build (unsigned)
+        run: make -C browser safari
+      - name: Pack Xcode project
+        run: ditto -c -k --keepParent browser/dist/safari-xcode browser/dist/safari-xcode.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: safari-xcode
+          path: browser/dist/safari-xcode.zip
