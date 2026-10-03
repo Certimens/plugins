@@ -1,0 +1,16 @@
+# What belongs to no agent. Each project ignores what it produces itself, in its own
+# .gitignore: the root has neither tooling nor dependencies.
+
+# macOS, on the machines used for the Safari conversion and the Word trials.
+.DS_Store
+
+# Claude Code: CLAUDE.md and .claude/skills/ are part of the repository — they describe the
+# rules the four agents share. Only machine-specific permissions stay out.
+.claude/settings.local.json
+
+# build-site.py imports its content from the file beside it, and Python caches what it imports.
+scripts/__pycache__/
+
+# The documentation site, built by `make site`. Each agent ignores its own dist/ in its own
+# .gitignore; this one belongs to no agent, so it is ignored here.
+/dist/
