@@ -1,0 +1,28 @@
+// Type checking for what the extension ships — `npm run lint:types`, no build step and no
+// transpilation: the file that is checked is the file that is published.
+//
+// Two configurations, because the extension has two global scopes and they are not the same
+// one. This is the pages' scope: the popup, the options page and the content script. They load
+// i18n.js and ui.js as classic scripts and share their declarations, exactly as the ESLint
+// configuration describes. The service worker is jsconfig.worker.json — it has no `document`,
+// and it declares names of its own that collide with the pages' when both are read as one.
+//
+// `strict` stays off, deliberately. Turning it on means a JSDoc type on every parameter of
+// every function, sixteen files of it, for what it catches here: nothing the agents have ever
+// got wrong. What is caught without it is what we do get wrong — a property that does not
+// exist on a DOM node or on a `chrome.*` answer, a call with the wrong number of arguments, a
+// value used as a number that is not one. Tightening it later is a configuration line, plus
+// the annotations it then asks for.
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "noEmit": true,
+    "target": "es2022",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "strict": false,
+    // @types/chrome only: nothing here runs on Node.
+    "types": ["chrome"]
+  },
+  "include": ["src/**/*.js", "types/*.d.ts"],
+  "exclude": ["src/background.js"]
+}

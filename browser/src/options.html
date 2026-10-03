@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Certimens — Agent de rédaction</title>
+    <link rel="stylesheet" href="ui.css">
+    <style>
+        body { padding: 40px 16px; }
+        main { max-width: 480px; margin: 0 auto; }
+    </style>
+</head>
+<body>
+    <main class="stack">
+        <div class="card stack">
+            <div class="stack" style="gap: 8px">
+                <div class="brand"><img class="mark" src="icons/icon128.png" alt=""><h1>Certi<span class="mens">mens</span></h1><span id="version" class="version"></span></div>
+                <p class="muted" data-i18n="options.intro"></p>
+            </div>
+
+            <!-- What a store install never says: the version changed. Filled by ui.js, once,
+                 and empty the rest of the time — .alert:empty hides it. -->
+            <p id="updated" class="alert info"></p>
+
+            <form id="form" class="stack">
+                <p class="muted" data-i18n="pair.intro"></p>
+                <div id="pairing" class="stack" hidden>
+                    <p class="code" id="userCode" role="status"></p>
+                    <a id="pairOpen" class="btn" target="_blank" rel="noopener" data-i18n="pair.open"></a>
+                    <p class="muted small" data-i18n="pair.waiting"></p>
+                    <button type="button" id="pairCancel" class="link small" data-i18n="pair.cancel"></button>
+                </div>
+                <details id="advanced" class="advanced">
+                    <summary data-i18n="login.advanced"></summary>
+                    <div class="field">
+                        <label for="engineUrl" data-i18n="login.engineUrl"></label>
+                        <input id="engineUrl" type="url" placeholder="https://monespace.certimens.fr">
+                        <p class="muted small" data-i18n="login.engineUrlHelp"></p>
+                    </div>
+                </details>
+                <div class="actions">
+                    <button type="submit" id="pairStart" class="btn" data-i18n="pair.submit"></button>
+                    <button type="button" id="test" class="btn outlined" data-i18n="options.test"></button>
+                    <!-- Shown only when a session is held. The popup carries the same action as an
+                         icon, but this page is where the student comes to see which account is
+                         connected, and it said so without offering any way to stop. -->
+                    <button type="button" id="logout" class="btn outlined" hidden data-i18n="account.logout"></button>
+                </div>
+            </form>
+            <div id="message" class="alert"></div>
+        </div>
+
+        <div class="card">
+            <h2 style="margin-bottom: 8px" data-i18n="options.sync"></h2>
+            <div id="status" class="status muted" data-i18n="options.loading"></div>
+        </div>
+
+        <!-- What the institution proposes. It tells the engine where its students write, and
+             the agent reads it to propose those addresses — never to grant them: the browser is
+             what asks for permission, one address at a time, because it demands a user gesture.
+             The block stays hidden as long as there is nothing to propose, and it does not
+             replace the manual add just below. -->
+        <div id="proposed" class="card stack" style="gap: 12px" hidden>
+            <div class="stack" style="gap: 6px">
+                <h2 data-i18n="sites.proposedTitle"></h2>
+                <p id="proposedHelp" class="muted small"></p>
+            </div>
+            <div id="proposedList" class="status muted small"></div>
+        </div>
+
+        <!-- The sites the student adds themselves. No manifest can name every institution's
+             Moodle: this is therefore where the address is added, and the browser is what asks
+             for permission, because it demands a user gesture. -->
+        <div class="card stack" style="gap: 12px">
+            <div class="stack" style="gap: 6px">
+                <h2 data-i18n="sites.title"></h2>
+                <p class="muted small" data-i18n="sites.help"></p>
+            </div>
+            <form id="siteForm" class="stack">
+                <div class="field">
+                    <label for="siteUrl" data-i18n="sites.label"></label>
+                    <input id="siteUrl" type="url" placeholder="https://moodle.mon-etablissement.fr/mod/assign/view.php?id=42">
+                </div>
+                <div class="actions">
+                    <button type="submit" class="btn outlined" data-i18n="sites.add"></button>
+                </div>
+            </form>
+            <div id="siteList" class="status muted small"></div>
+        </div>
+
+        <div class="card stack" style="gap: 12px">
+            <div class="stack" style="gap: 6px">
+                <h2 data-i18n="options.debug"></h2>
+                <label class="row" style="justify-content: flex-start; gap: 8px">
+                    <input id="debug" type="checkbox" style="width: auto">
+                    <span data-i18n="options.debugLabel"></span>
+                </label>
+                <p class="muted small" data-i18n="options.debugHelp"></p>
+            </div>
+            <div id="debugLog" class="status muted small" data-i18n="options.emptyLog"></div>
+            <div class="actions">
+                <button type="button" id="clearLog" class="btn outlined" data-i18n="options.clearLog"></button>
+            </div>
+        </div>
+
+        <p class="muted small" data-i18n="options.tokenNote"></p>
+    </main>
+
+    <script src="constants.js"></script>
+    <script src="i18n.js"></script>
+    <script src="ui.js"></script>
+    <script src="pages.js"></script>
+    <script src="options.js"></script>
+</body>
+</html>

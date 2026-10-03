@@ -1,0 +1,5 @@
+# What this project produces or installs.
+node_modules/
+dist/
+# The VS Code `make test-host` downloads, and its throwaway profile.
+.vscode-test/
