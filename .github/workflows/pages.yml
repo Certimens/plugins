@@ -1,0 +1,203 @@
+name: Site (GitHub Pages)
+
+# The one site this repository publishes, and everything it holds:
+#
+#   /                      the installation documentation, in French and in English — how a
+#                            student installs each agent, through a store or by hand
+#   /word/                 the Word add-in — the code Word loads at every opening
+#   /libreoffice/update.xml  the update feed every installed .oxt asks, and the only way a
+#                            LibreOffice extension learns that a newer one exists
+#
+# **A deployment replaces the whole site.** `actions/deploy-pages` knows no partial update:
+# whatever is not in the artifact is gone. The two parts above belong to two agents with two
+# version lines, so every deployment — whichever agent caused it — has to carry both. That is
+# what this workflow is for, and why nothing else in the repository calls `deploy-pages`.
+#
+# Where each part comes from depends on who is deploying:
+#
+# | Caller | `/` | /word/ | /libreoffice/update.xml |
+# | --- | --- | --- | --- |
+# | `workflow_dispatch` | this branch | **rebuilt at the last `word-v*` tag**, unless `word: branch` | the last `libreoffice-v*` tag |
+# | release of `word` | the tag's commit | the run's package, at the tag | the last `libreoffice-v*` tag |
+# | release of `libreoffice` | the tag's commit | **rebuilt at the last `word-v*` tag** | the tag being released |
+#
+# The rebuild is the thing to understand. The add-in is not a package, it is **served**: what is
+# on the site is what runs, in front of every student, the moment it is deployed. Publishing the
+# documentation — or a LibreOffice feed — must therefore not carry the branch's Word code along
+# with it. So the add-in is rebuilt from a worktree at its own last tag: same source, same
+# version, same files as the deployment that published it.
+#
+# On demand, with no release and no tag:
+#
+#   gh workflow run pages.yml --ref my-branch                  # docs and feed; add-in untouched
+#   gh workflow run pages.yml --ref my-branch -f word=branch   # …and the branch's add-in too
+#
+# The second form *does* replace production with the branch's add-in, deliberately — it is how a
+# Word fix ships without a release. The manifest installed in Word does not change (same
+# addresses): nothing to reload on the Word side, only the task pane to reopen.
+on:
+  workflow_dispatch:
+    inputs:
+      word:
+        description: "Word add-in: `tag` keeps the published version, `branch` ships this branch's"
+        type: choice
+        default: tag
+        options:
+          - tag
+          - branch
+  workflow_call:
+    inputs:
+      agent:
+        description: The agent being released — word or libreoffice
+        type: string
+        default: ''
+      tag:
+        description: Its tag, which gives the version being published
+        type: string
+        default: ''
+      word:
+        description: Where the add-in comes from when it is not this release's — tag or branch
+        type: string
+        default: tag
+
+permissions:
+  contents: read
+
+# One Pages deployment at a time: a run started by hand and a release do not step on each other.
+concurrency:
+  group: github-pages
+
+jobs:
+  pages:
+    name: Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    env:
+      AGENT: ${{ inputs.agent }}
+      TAG: ${{ inputs.tag }}
+    environment:
+      name: github-pages
+      # The root of the site, which is the documentation's home page. It used to point at
+      # `word/` because the add-in was all this site carried; it carries three things now.
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      # fetch-depth 0 and the tags: the builds read them (git describe) to version what they
+      # produce, the feed reads the last libreoffice tag, and the worktree below needs the last
+      # word tag to exist locally.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: word/package-lock.json
+
+      # The Word add-in, built here unless this very run already built it.
+      - name: Word add-in (from this release)
+        if: inputs.agent == 'word'
+        uses: actions/download-artifact@v8
+        with:
+          name: certimens-word
+          path: word/dist
+      - name: Word add-in (rebuilt at its own last tag)
+        if: inputs.agent != 'word' && inputs.word != 'branch'
+        run: |
+          set -eu
+          tag="$(git describe --tags --abbrev=0 --match 'word-v*' 2>/dev/null || true)"
+          if [ -z "$tag" ]; then
+            echo "::warning::No word-v* tag yet, so there is no published add-in to put back: \
+          /word/ will be missing from the site, and taskpane.html will answer 404. Run this \
+          workflow again with word=branch to publish this branch's add-in, or make a word release."
+            exit 0
+          fi
+          # A worktree, not `git checkout -- word`: ui.css, ui.js, i18n.js, the fonts and the
+          # icons are symbolic links into browser/, so restoring word/ alone would build the
+          # tag's add-in around today's shared files. The whole tree, or nothing.
+          git worktree add ../word-release "$tag"
+          make -C ../word-release/word install
+          make -C ../word-release/word build RELEASE="$tag"
+          mkdir -p word/dist && cp -r ../word-release/word/dist/word word/dist/word
+          echo "::notice::Add-in rebuilt at $tag, the version already published."
+      # Only when asked for: this puts a build nobody has released in front of every student.
+      # It stays reachable, because it is how a Word fix ships without a release.
+      - name: Word add-in (from this branch)
+        if: inputs.agent != 'word' && inputs.word == 'branch'
+        run: |
+          make -C word install
+          make -C word build
+          make -C word lint-manifest
+
+      # The LibreOffice feed. Standard library and git tags: no venv, nothing to install. It is
+      # written on **every** deployment, because the site it lives on is replaced whole.
+      - name: LibreOffice update feed
+        run: |
+          set -eu
+          if [ "$AGENT" = libreoffice ]; then
+            make -C libreoffice feed RELEASE="$TAG"
+          else
+            make -C libreoffice feed
+          fi
+
+      # The documentation: standard-library Python, nothing to install. It is built aside and
+      # laid over the agents' files below, because it has the last word on one name.
+      - name: Documentation
+        run: make site SITE_OUT=documentation
+
+      # **The order is the rule here.** The three parts share one site and two of them share a
+      # directory: the add-in is served from `/word/`, the feed is `/libreoffice/update.xml`,
+      # and the documentation has a page at each of those addresses. Only `index.html` is
+      # disputed, and the documentation wins it — hence agents first, documentation over them.
+      #
+      # The add-in's five frozen URLs (taskpane.html and four icons) are not index.html, so
+      # nothing an installed manifest points at is ever touched by this overlay.
+      - name: Site layout
+        run: |
+          set -eu
+          mkdir site
+          if [ -d word/dist/word ]; then cp -r word/dist/word/. site/word/; fi
+          if [ -f libreoffice/dist/update.xml ]; then
+            mkdir -p site/libreoffice && cp libreoffice/dist/update.xml site/libreoffice/
+          fi
+          cp -r documentation/. site/
+
+          # What an installed manifest asks for, checked before it is served rather than after:
+          # a run that deployed the documentation and silently dropped the add-in is exactly
+          # what happened once, and only a 404 on a student's Word said so.
+          if [ -d word/dist/word ]; then
+            for file in taskpane.html manifest.xml version.txt icons/icon32.png; do
+              if [ ! -f "site/word/$file" ]; then
+                echo "::error::site/word/$file is missing: the documentation overlay has covered the add-in."
+                exit 1
+              fi
+            done
+          else
+            echo "::warning::No add-in on this site: /word/taskpane.html will answer 404."
+          fi
+          find site -type f | sort
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v5
+      - name: Summary
+        env:
+          SITE: ${{ steps.deploy.outputs.page_url }}
+        run: |
+          {
+            echo "### Site published"
+            echo
+            echo "- Documentation: $SITE"
+            if [ -f word/dist/VERSION ]; then
+              echo "- Word add-in \`$(cat word/dist/VERSION)\`: ${SITE}word/manifest.xml — reopen the task pane in Word to load it."
+            else
+              echo "- Word add-in: **not on this site** — \`${SITE}word/taskpane.html\` answers 404."
+            fi
+            if [ -f libreoffice/dist/update.xml ]; then
+              echo "- LibreOffice update feed \`$(sed -n 's/.*<version value="\([^"]*\)".*/\1/p' libreoffice/dist/update.xml)\`: ${SITE}libreoffice/update.xml"
+            else
+              echo "- LibreOffice update feed: **not written** — no \`libreoffice-v*\` tag yet."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
