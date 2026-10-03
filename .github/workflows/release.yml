@@ -1,0 +1,387 @@
+name: Release
+
+# **One agent, one tag, one version.** `browser-vX.Y.Z` publishes the browser extension and
+# nothing else; `word-v…`, `libreoffice-v…` and `vscode-v…` do the same for the three others.
+# Nothing is bumped by hand anywhere: the tag gives the package its version, and each build
+# reads *its own* tags only (`git describe --match`).
+#
+# The four agents used to be versioned together, and one tag republished all four. A store
+# reviews a package on every submission — AMO and AppSource do it by hand, and it takes days —
+# and three of those four reviews covered a package identical to the previous one. The four
+# version lines therefore diverge now, and that is the point: the version a store displays is
+# the version of the code it serves.
+#
+# ## Releasing means running this workflow
+#
+# *Actions › Release › Run workflow*, and nothing locally — **the tag is laid here**, not on the
+# machine of whoever publishes. The form has three fields:
+#
+# - **agent**: the one being published, or `report only` (the default), which writes a report
+#   and nothing else: for each of the four, its last tag, the commits that touched its package
+#   since, the shared files that bind several of them, and what `CHANGELOG.md` already devotes
+#   to it. That is the "what is left to release?" question, answered in the run summary;
+# - **version**: `X.Y.Z`, or empty — and then the changelog section that has no tag yet gives
+#   it. The changelog is written before the tag anyway: it may as well decide the number;
+# - **dry_run**: checked by default. Everything is verified — changelog, version moving forward,
+#   tag free, package actually changed — and **nothing is published**. Unchecking is the gesture
+#   that publishes.
+#
+# The run refuses to publish an agent whose package has not moved since its last tag: that
+# submission would have its stores review a package they already have. When it is wanted anyway
+# (a package rejected by a store, say), the hand-laid tag is still accepted:
+# `git tag browser-v1.5.0 && git push origin browser-v1.5.0` triggers this same workflow,
+# without going through the form.
+#
+# Once the agent and its version are settled, the run:
+# 1. runs the CI for **that agent alone**, which builds its packages at the version of the tag
+#    to come (the four-way coherence check runs anyway: it compares all four, including those
+#    that are not being built);
+# 2. lays and pushes the tag — the CI is green, so the tag does not name a package that fails to
+#    build;
+# 3. creates that agent's GitHub release, with its packages named after its version and, for
+#    notes, **the section CHANGELOG.md devotes to it** — not the commit list, which says what
+#    the repository did and not what this agent brings. A version without a section fails the
+#    run before it builds anything;
+# 4. publishes it to its stores. A store with no credentials configured is skipped; a failing
+#    store does not block the others (re-run its job alone).
+#
+# The first submission to each store, and every Safari submission, are done by hand (see
+# docs/publication.md).
+on:
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: "What to publish — `report only` writes a report and publishes nothing"
+        type: choice
+        default: report only
+        options:
+          - report only
+          - browser
+          - word
+          - libreoffice
+          - vscode
+      version:
+        description: "Version X.Y.Z — empty: the one of the changelog section that has no tag yet"
+        type: string
+        default: ''
+      dry_run:
+        description: Dry run — check everything, publish nothing
+        type: boolean
+        default: true
+  push:
+    tags:
+      - 'browser-v*'
+      - 'word-v*'
+      - 'libreoffice-v*'
+      - 'vscode-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  # What this run would publish, and whether it is allowed to. Everything else in this file
+  # refers to it rather than reading `github.ref_name` or the form again: the two entrances —
+  # the button and the hand-pushed tag — meet here, and nowhere else.
+  plan:
+    name: What this run publishes
+    runs-on: ubuntu-latest
+    outputs:
+      name: ${{ steps.pushed.outputs.name || steps.button.outputs.agent }}
+      version: ${{ steps.pushed.outputs.version || steps.button.outputs.version }}
+      tag: ${{ steps.pushed.outputs.tag || steps.button.outputs.tag }}
+      go: ${{ steps.pushed.outputs.go || steps.button.outputs.go }}
+    steps:
+      # fetch-depth 0 and the tags: the report starts from the last tag **of each agent**, and
+      # the suggested version from the highest of them.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # A hand-pushed tag says on its own what to publish: its prefix names the agent, the rest
+      # is the version. The changelog is read **before** building — a release whose notes are
+      # missing would otherwise surface half an hour later, while filling in the store listing,
+      # and everything would have to be done again for one forgotten paragraph.
+      - id: pushed
+        if: github.event_name == 'push'
+        run: |
+          set -eu
+          name="${GITHUB_REF_NAME%%-v*}"
+          version="${GITHUB_REF_NAME#*-v}"
+          case "$name" in
+            browser|word|libreoffice|vscode) ;;
+            *) echo "::error::Tag $GITHUB_REF_NAME: unknown agent '$name'." ; exit 1 ;;
+          esac
+          case "$version" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::Tag $GITHUB_REF_NAME: version expected as X.Y.Z." ; exit 1 ;;
+          esac
+          python3 scripts/changelog-section.py "$name" "$version" > /dev/null
+          {
+            echo "name=$name"
+            echo "version=$version"
+            echo "tag=$GITHUB_REF_NAME"
+            echo "go=true"
+          } >> "$GITHUB_OUTPUT"
+          echo "### $name $version" >> "$GITHUB_STEP_SUMMARY"
+      # The button. The script writes the report into the run summary and — when an agent is
+      # chosen — adds the version it settled on, the notes the release will publish, or the
+      # refusal and what it takes to lift it. It is the script that writes `agent`, `version`
+      # and `tag` into the step's outputs: the workflow deduces nothing twice.
+      - id: button
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          AGENT: ${{ inputs.agent }}
+          VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -eu
+          case "$AGENT" in
+            browser|word|libreoffice|vscode) ;;
+            *) AGENT='' ;;  # `report only`: the report on the four, and nothing else
+          esac
+          if [ -z "$AGENT" ]; then
+            python3 scripts/release-plan.py >> "$GITHUB_STEP_SUMMARY"
+          elif [ -z "$VERSION" ]; then
+            python3 scripts/release-plan.py "$AGENT" >> "$GITHUB_STEP_SUMMARY"
+          else
+            python3 scripts/release-plan.py "$AGENT" "$VERSION" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "$AGENT" ] && [ "$DRY_RUN" != "true" ]; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$AGENT" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "> **Dry run**: nothing is published. Run again with \`dry_run\` unchecked." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  ci:
+    needs: plan
+    if: needs.plan.outputs.go == 'true'
+    uses: ./.github/workflows/ci.yml
+    with:
+      agent: ${{ needs.plan.outputs.name }}
+      version: ${{ needs.plan.outputs.tag }}
+
+  # The tag is laid **after** the CI: a tag must not name a package that fails to build, and a
+  # version burned by a red test cannot be laid again (a store refuses a version that goes
+  # backwards). The packages were already built at that tag's version — `make build
+  # RELEASE=<agent>-vX.Y.Z` does not need it to exist.
+  #
+  # Pushed with the run's token, this tag does **not** trigger a second run of this workflow:
+  # GitHub re-runs nothing on a push made with `GITHUB_TOKEN`. That is exactly what we want —
+  # the release carries on here, in the run being watched.
+  tag:
+    name: Lay the tag
+    needs: [plan, ci]
+    if: needs.plan.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Tag
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+        run: |
+          set -eu
+          # Already there when a hand-pushed tag is what started this run.
+          if [ -n "$(git ls-remote --tags origin "refs/tags/$TAG")" ]; then
+            echo "::notice::Tag $TAG is already on the repository: nothing to lay."
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -a "$TAG" -m "$TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$TAG"
+          echo "::notice::Tag $TAG laid on $GITHUB_SHA."
+
+  github:
+    name: GitHub release
+    needs: [plan, ci, tag]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # fetch-depth 0 and the tags: the release notes start from **this agent's previous** tag.
+      # Without it, GitHub would reach back to the previous tag of all agents combined and the
+      # extension's release would list the Word add-in's commits.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # Without `name`, every artifact of the run is downloaded, each into its own folder. Since
+      # the CI built a single agent, they are that agent's: the script below only names what is
+      # there, and therefore has nothing to know about which agent it is.
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+      - name: Name packages after the version
+        env:
+          AGENT: ${{ needs.plan.outputs.name }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          set -eu
+          mkdir release
+          take() { [ -f "$1" ] && cp "$1" "release/$2" || true; }
+          for package in chrome firefox safari; do
+            take "artifacts/extension/$package.zip" "certimens-browser-$VERSION-$package.zip"
+          done
+          take artifacts/safari-xcode/safari-xcode.zip "certimens-browser-$VERSION-safari-xcode.zip"
+          take artifacts/certimens-libreoffice/libreoffice.oxt "certimens-libreoffice-$VERSION.oxt"
+          take artifacts/certimens-vscode/certimens-vscode.vsix "certimens-vscode-$VERSION.vsix"
+          take artifacts/certimens-word/word/manifest.xml "certimens-word-$VERSION-manifest.xml"
+          if [ -z "$(ls -A release)" ]; then
+            echo "::error::No package for agent '$AGENT' in the run's artifacts."
+            exit 1
+          fi
+          (cd release && sha256sum -- * > SHA256SUMS.txt)
+          ls -l release
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AGENT: ${{ needs.plan.outputs.name }}
+          VERSION: ${{ needs.plan.outputs.version }}
+          TAG: ${{ needs.plan.outputs.tag }}
+        run: |
+          set -eu
+          # The release page is read by students and teachers: its title and its notes are in
+          # French, like the changelog they come from.
+          case "$AGENT" in
+            browser)     title="Extension navigateur $VERSION" ;;
+            word)        title="Complément Word $VERSION" ;;
+            libreoffice) title="Extension LibreOffice $VERSION" ;;
+            vscode)      title="Extension VS Code $VERSION" ;;
+          esac
+          # What the version changes, written by hand in CHANGELOG.md: the two bilingual store
+          # sentences are already there, and the release carries them as they are. The `plan`
+          # job has already checked that the section exists; here it becomes the body.
+          python3 scripts/changelog-section.py "$AGENT" "$VERSION" > notes.md
+          # The same agent's previous tag, if any: the full comparison is one link away, without
+          # cluttering the notes with commits touching the three other agents.
+          previous="$(git describe --tags --abbrev=0 --match "$AGENT-v*" "$TAG^" 2>/dev/null || true)"
+          if [ -n "$previous" ]; then
+            printf '\n---\n\n[Tous les changements depuis %s](%s/compare/%s...%s)\n' \
+              "$previous" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "$previous" "$TAG" >> notes.md
+          fi
+          gh release create "$TAG" release/* \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --title "$title" --notes-file notes.md
+
+  # The GitHub Pages site, which two agents share: the Word add-in (https://certimens.github.io/
+  # plugins/word/, the WORD_BASE_URL of its build) and the LibreOffice update feed, which is
+  # how an installed .oxt learns that a newer one exists. Pages has to be enabled once:
+  # Settings › Pages › Source: GitHub Actions.
+  #
+  # **Both releases deploy, and a deployment carries the whole site**: `deploy-pages` has no
+  # partial update, so a LibreOffice release that published only its feed would take the add-in
+  # offline for every student. pages.yml is what knows where each part comes from; outside a
+  # release, the same workflow publishes on demand.
+  pages:
+    name: Site (GitHub Pages)
+    needs: [plan, ci, tag]
+    if: needs.plan.outputs.name == 'word' || needs.plan.outputs.name == 'libreoffice'
+    uses: ./.github/workflows/pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    with:
+      agent: ${{ needs.plan.outputs.name }}
+      tag: ${{ needs.plan.outputs.tag }}
+
+  # Visual Studio Marketplace: a single package, published with the publisher's token (PAT).
+  # Open VSX (VSCodium, Cursor, Gitpod) has no free API for a verified publisher: publishing
+  # there stays manual, like Safari (see docs/publication.md).
+  marketplace:
+    name: Publish to VS Code Marketplace
+    needs: [plan, github]
+    if: needs.plan.outputs.name == 'vscode'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: vscode/package-lock.json
+      # vsce is declared by the VS Code agent, not by the repository. `install-publish` and not
+      # `install`: this job holds the PAT, and no package of the tree gets to run code at
+      # install time next to it (see the agent's Makefile). `@vscode/vsce-sign` is the one that
+      # would, and its script only downloads a binary for verifying signatures — which
+      # publishing an already-built .vsix never does.
+      - name: Install
+        run: make -C vscode install-publish
+      - uses: actions/download-artifact@v8
+        with:
+          name: certimens-vscode
+          path: vscode/dist
+      - name: Publish
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "::notice::VS Code Marketplace not configured (VSCE_PAT empty): skipped."
+            exit 0
+          fi
+          make -C vscode publish
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+  stores:
+    name: Publish to ${{ matrix.store }}
+    needs: [plan, github]
+    if: needs.plan.outputs.name == 'browser'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { store: chrome, id: CHROME_EXTENSION_ID }
+          # Gated on the JWT issuer, not FIREFOX_EXTENSION_ID: that one is hardcoded below, so
+          # it would never be empty and the job could never skip when AMO isn't configured.
+          - { store: firefox, id: FIREFOX_JWT_ISSUER }
+          - { store: edge, id: EDGE_PRODUCT_ID }
+          - { store: opera, id: OPERA_PACKAGE_ID }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: browser/package-lock.json
+      # publish-browser-extension is declared by the browser agent, which also knows which
+      # package goes to which store: the publish-<store> target of its Makefile.
+      #
+      # `install-publish` and not `install`: the four stores' credentials are in the step below,
+      # and a plain `npm ci` would run the install script of any of the four hundred packages of
+      # the lint and test tooling in the same runner. None declares one — `npm run lint:deps`
+      # fails the build if that stops being true — and this installs with --ignore-scripts so it
+      # stays a property rather than a coincidence.
+      - name: Install
+        run: make -C browser install-publish
+      - uses: actions/download-artifact@v8
+        with:
+          name: extension
+          path: browser/dist
+      - name: Publish
+        run: |
+          if [ -z "${!STORE_ID}" ]; then
+            echo "::notice::$STORE not configured ($STORE_ID empty): skipped."
+            exit 0
+          fi
+          make -C browser "publish-$STORE"
+        env:
+          STORE: ${{ matrix.store }}
+          STORE_ID: ${{ matrix.id }}
+          # Chrome Web Store API v2, Google Cloud service account.
+          CHROME_API_VERSION: v2
+          CHROME_EXTENSION_ID: ${{ vars.CHROME_EXTENSION_ID }}
+          CHROME_PUBLISHER_ID: ${{ vars.CHROME_PUBLISHER_ID }}
+          CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL }}
+          CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
+          # addons.mozilla.org, developer account API keys (JWT).
+          FIREFOX_EXTENSION_ID: agent@certimens.fr
+          FIREFOX_CHANNEL: listed
+          FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
+          FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
+          # Edge Add-ons, API v1.1 (Partner Center › Publish API).
+          EDGE_PRODUCT_ID: ${{ vars.EDGE_PRODUCT_ID }}
+          EDGE_CLIENT_ID: ${{ vars.EDGE_CLIENT_ID }}
+          EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
+          # Opera Add-ons: no official API, developer account session cookie.
+          OPERA_PACKAGE_ID: ${{ vars.OPERA_PACKAGE_ID }}
+          OPERA_SESSION_ID: ${{ secrets.OPERA_SESSION_ID }}

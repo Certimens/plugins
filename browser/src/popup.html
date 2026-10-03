@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Certimens — Agent de rédaction</title>
+    <link rel="stylesheet" href="ui.css">
+    <style>
+        /* The popup is a window the browser draws, and its corners belong to it: no page can
+           paint outside them. What a page can do is stop painting *into* them. As long as the
+           root element declares no background of its own, the body's is stretched over the whole
+           canvas and the body paints nothing itself (CSS Backgrounds 3, § 2.11.2) — so a radius
+           on the body changes nothing. A root background that is not `none`, even an entirely
+           transparent one, ends that: the body paints its own box, and can be rounded like every
+           surface it holds. The corner then shows the browser's own popup surface, which
+           `color-scheme` in ui.css has already told which scheme we are in. */
+        html { background-image: linear-gradient(transparent, transparent); }
+        body { width: 340px; padding: 16px; border-radius: var(--radius); }
+        h1 { font-size: 1.35rem; }
+        h2 { font-size: 1.0625rem; font-weight: 700; letter-spacing: 0; }
+        .brand .mark { width: 24px; height: 24px; }
+        .card { padding: 16px; }
+    </style>
+</head>
+<body class="stack" style="gap: 12px">
+    <div class="brand">
+        <img class="mark" src="icons/icon128.png" alt="">
+        <h1>Certi<span class="mens">mens</span></h1>
+        <div id="actions" class="icon-actions" hidden>
+            <button type="button" id="pause" class="icon-btn" aria-pressed="false">
+                <svg id="iconPause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9.5 5v14M14.5 5v14"/></svg>
+                <svg id="iconPlay" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true" hidden><path d="M8 5.5l11 6.5-11 6.5z"/></svg>
+            </button>
+            <button type="button" id="logout" class="icon-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9"/><path d="M17.5 8.5 21 12l-3.5 3.5"/><path d="M21 12H10"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- What a store install never says: the version changed. Filled by ui.js, once, and
+         empty the rest of the time — .alert:empty hides it. -->
+    <p id="updated" class="alert info"></p>
+
+    <form id="login" class="card stack" hidden>
+        <p class="muted" data-i18n="pair.intro"></p>
+        <!-- Shown once a code has been asked for. The code is read off this screen and typed
+             into the Certimens space, so it is the one thing on the card that must be big and
+             spaced; `pair.code` is announced to a screen reader when it appears. -->
+        <div id="pairing" class="stack" hidden>
+            <p class="code" id="userCode" role="status"></p>
+            <a id="pairOpen" class="btn block" target="_blank" rel="noopener" data-i18n="pair.open"></a>
+            <p class="muted small" data-i18n="pair.waiting"></p>
+            <button type="button" id="pairCancel" class="link small" data-i18n="pair.cancel"></button>
+        </div>
+        <details id="advanced" class="advanced">
+            <summary data-i18n="login.advanced"></summary>
+            <div class="field">
+                <label for="engineUrl" data-i18n="login.engineUrl"></label>
+                <input id="engineUrl" type="url" placeholder="https://monespace.certimens.fr">
+                <p class="muted small" data-i18n="login.engineUrlHelp"></p>
+            </div>
+        </details>
+        <button type="submit" id="pairStart" class="btn block" data-i18n="pair.submit"></button>
+    </form>
+
+    <div id="account" class="stack" style="gap: 12px" hidden>
+        <div class="small">
+            <span class="muted"><span data-i18n="account.connected"></span> <strong id="who" style="color: var(--text)"></strong></span>
+            <div id="whoEmail" class="muted" hidden></div>
+        </div>
+        <div id="pausedAlert" class="alert error small" hidden data-i18n="pause.alert"></div>
+
+        <div id="doc" class="card stack" hidden>
+            <div class="muted small" data-i18n="doc.open"></div>
+            <div id="linked" class="stack" style="gap: 6px" hidden>
+                <h2 id="linkedName"></h2>
+                <div class="alert ok small" data-i18n="doc.linked"></div>
+                <div id="submitted" class="muted small" hidden></div>
+                <div id="deadlineAlert" class="alert info small" hidden data-i18n="doc.deadlinePassed"></div>
+                <a id="open" class="small" target="_blank" rel="noopener" data-i18n="doc.openInCertimens"></a>
+                <div id="upload" class="stack" style="gap: 6px; margin-top: 6px">
+                    <button type="button" id="exportDocx" class="btn outlined block" hidden data-i18n="upload.sendDocx"></button>
+                    <button type="button" id="sendText" class="btn outlined block" hidden data-i18n="upload.sendText"></button>
+                    <label id="pickDocx" class="btn outlined block" hidden>
+                        <span data-i18n="upload.pickDocx"></span>
+                        <input id="docxFile" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+                    </label>
+                    <div id="uploadHint" class="muted small"></div>
+                </div>
+            </div>
+            <form id="create" class="stack" hidden>
+                <div class="field">
+                    <label for="documentName" data-i18n="doc.name"></label>
+                    <input id="documentName" type="text" required>
+                </div>
+            </form>
+            <div id="assignmentBox" class="field" hidden>
+                <label for="assignment" data-i18n="assignment.label"></label>
+                <select id="assignment"></select>
+            </div>
+            <button type="submit" form="create" id="createBtn" class="btn block" hidden data-i18n="doc.create"></button>
+            <button type="button" id="submit" class="btn block" hidden></button>
+        </div>
+        <!-- No known editor in this tab. This is where the student says "this is where I
+             write": a permission for that single address, and measuring starts. -->
+        <div id="noDoc" class="card stack" hidden>
+            <p class="muted" data-i18n="doc.none"></p>
+            <button type="button" id="measureHere" class="btn outlined" hidden data-i18n="sites.measureHere"></button>
+        </div>
+    </div>
+
+    <div id="message" class="alert small"></div>
+
+    <button type="button" id="options" class="link small" style="align-self: flex-start" data-i18n="options.link"></button>
+
+    <script src="constants.js"></script>
+    <script src="i18n.js"></script>
+    <script src="ui.js"></script>
+    <script src="pages.js"></script>
+    <script src="popup.js"></script>
+</body>
+</html>
