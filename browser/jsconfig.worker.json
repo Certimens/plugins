@@ -1,0 +1,23 @@
+// The service worker's scope (see jsconfig.json for the pages'). It loads constants.js and
+// i18n.js with importScripts, and nothing else of the extension's code — in particular not
+// ui.js, whose window helpers mean nothing here.
+//
+// Two configurations rather than one, because the worker and the pages are two global scopes:
+// each may declare a name the other also declares, and reading the files as one program would
+// report a collision that cannot happen. What they do have to agree on is in constants.js,
+// listed below and by the pages' configuration both.
+//
+// `dom` although a worker has no DOM: @types/chrome does not load without lib.dom, and lib.dom
+// and lib.webworker cannot be combined (they redeclare each other). What this file buys is the
+// scope separation above, not a faithful list of the worker's globals.
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "noEmit": true,
+    "target": "es2022",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "strict": false,
+    "types": ["chrome"]
+  },
+  "files": ["types/storage.d.ts", "types/worker.d.ts", "src/constants.js", "src/i18n.js", "src/background.js"]
+}

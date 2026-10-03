@@ -1,0 +1,24 @@
+// Type checking for what the add-in ships — `npm run lint:types`, no build step and no
+// transpilation: the file that is checked is the file that is served.
+//
+// One scope, unlike the browser extension: everything here is loaded by the same page, the task
+// pane, as classic scripts sharing their declarations — i18n.js and ui.js first (symbolic links
+// into the browser agent), then agent.js, sensor.js and taskpane.js.
+//
+// `strict` stays off, deliberately, and for the same reason as in the three other agents: it
+// would ask for a JSDoc type on every parameter of every function, for what it catches here —
+// nothing we have ever got wrong. What is caught without it is what we do get wrong: a property
+// that does not exist on a DOM node or on an Office.js object, a call with the wrong number of
+// arguments, a value used as a number that is not one.
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "noEmit": true,
+    "target": "es2022",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "strict": false,
+    // Office.js is loaded by the pane from Microsoft's CDN, and declares Word and Office.
+    "types": ["office-js"]
+  },
+  "include": ["src/**/*.js", "types/*.d.ts"]
+}
