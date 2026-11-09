@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@types/office-js": "1.0.615",
+    "@types/office-js": "1.0.616",
     "eslint": "10.14.0",
     "globals": "17.14.0",
     "html-validate": "11.18.0",
